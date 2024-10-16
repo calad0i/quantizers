@@ -1,0 +1,49 @@
+exclude: '\.svg$|ap_types/|_version.py'
+
+repos:
+- repo: https://github.com/hhatto/autopep8
+  rev: v2.3.1
+  hooks:
+  - id: autopep8
+    language_version: python3
+    args: ['--max-line-length=65535',
+           '--ignore=E731,E402',
+           '--in-place',
+           ]
+
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v4.6.0
+  hooks:
+  - id: check-added-large-files
+  - id: check-case-conflict
+  - id: check-merge-conflict
+  - id: check-symlinks
+  - id: check-yaml
+  - id: debug-statements
+  - id: end-of-file-fixer
+  - id: mixed-line-ending
+  - id: requirements-txt-fixer
+  - id: trailing-whitespace
+
+- repo: https://github.com/asottile/setup-cfg-fmt
+  rev: v2.5.0
+  hooks:
+  - id: setup-cfg-fmt
+
+- repo: https://github.com/asottile/pyupgrade
+  rev: v3.16.0
+  hooks:
+  - id: pyupgrade
+    args: ["--py310-plus"]
+
+- repo: https://github.com/PyCQA/isort
+  rev: 5.13.2
+  hooks:
+  - id: isort
+    args: ['--line-length=65535']
+
+- repo: https://github.com/pre-commit/mirrors-clang-format
+  rev: v18.1.8
+  hooks:
+  - id: clang-format
+    types_or: [c++, c, cuda]
