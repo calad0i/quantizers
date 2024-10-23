@@ -12,7 +12,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */
+*/
 
 #ifndef __AP_FLOAT_H__
 #define __AP_FLOAT_H__
@@ -49,7 +49,7 @@ INLINE ap_uint<ceillog2(_AP_W)> msb_loc(ap_fixed_base<_AP_W, _AP_I, _AP_S, _AP_Q
 }
 
 template <int _AP_W, int _AP_I, bool _AP_S, ap_q_mode _AP_Q, ap_o_mode _AP_O, int _AP_N>
-auto rt_floorlog2(ap_fixed_base<_AP_W, _AP_I, _AP_S, _AP_Q, _AP_O, _AP_N> value)
+INLINE auto rt_floorlog2(ap_fixed_base<_AP_W, _AP_I, _AP_S, _AP_Q, _AP_O, _AP_N> value)
     -> ap_int_base<ceillog2(__AP_FLOAT_H_MAX(_AP_I - _AP_S, _AP_W - _AP_I + 1)) + (_AP_W - _AP_I > 0), (_AP_W - _AP_I > 0)> {
     // Runtime floorlog2 for fixed point numbers
     auto msb = msb_loc(value);
@@ -58,7 +58,7 @@ auto rt_floorlog2(ap_fixed_base<_AP_W, _AP_I, _AP_S, _AP_Q, _AP_O, _AP_N> value)
 }
 
 template <int _AP_W, int _AP_I, bool _AP_S, ap_q_mode _AP_Q, ap_o_mode _AP_O, int _AP_N>
-auto rt_ceillog2(ap_fixed_base<_AP_W, _AP_I, _AP_S, _AP_Q, _AP_O, _AP_N> value) -> decltype(rt_floorlog2(value)) {
+INLINE auto rt_ceillog2(ap_fixed_base<_AP_W, _AP_I, _AP_S, _AP_Q, _AP_O, _AP_N> value) -> decltype(rt_floorlog2(value)) {
     // Runtime ceillog2 for fixed point numbers
     auto msb = msb_loc(value);
     ap_ufixed<_AP_W, _AP_I> buf;

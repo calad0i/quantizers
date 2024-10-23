@@ -5,6 +5,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
+from quantizers.binary.binary_ops import binary_quantize, ternary_quantize
 from quantizers.fixed_point.fixed_point_ops import get_fixed_quantizer, round_mode_registry
 from quantizers.minifloat.float_point_ops import float_decompose, float_quantize
 
@@ -151,3 +152,19 @@ def test_float_decompose(xxx_mee0):
     assert jnp.all(xq == xq_), f'Float Decompose Error'
     assert jnp.all(jnp.abs(mm) < 2), f'Mantissa Error @ Overflow Number'  # type: ignore
     assert jnp.all(jnp.abs(mm) >= 1), f'Mantissa Error @ Overflow Number'  # type: ignore
+
+
+def test_binary_quantizer_grad(x_kif):
+    x, *_ = x_kif
+    xq = binary_quantize(x)
+    assert jnp.all((xq == -1) | (xq == 1)), f'Binary Quantizer Error'
+    grad = jax.grad(lambda x: jnp.sum(binary_quantize(x)))(x)
+    assert jnp.all(grad > 0), f'Gradient Error'
+
+
+def test_ternary_quantizer_grad(x_kif):
+    x, *_ = x_kif
+    xq = ternary_quantize(x)
+    assert jnp.all((xq == -1) | (xq == 0) | (xq == 1)), f'Ternary Quantizer Error'
+    grad = jax.grad(lambda x: jnp.sum(ternary_quantize(x)))(x)
+    assert jnp.all(grad > 0), f'Gradient Error'

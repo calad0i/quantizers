@@ -4,6 +4,7 @@ import cppyy
 import numpy as np
 import pytest
 
+from quantizers.binary.binary_ops import binary_quantize, ternary_quantize
 from quantizers.fixed_point.fixed_point_ops import get_fixed_quantizer
 from quantizers.minifloat.float_point_ops import float_quantize
 
@@ -26,18 +27,29 @@ def c_quantize_fixed(x, k, i, f, round_mode, overflow_mode):
     W, I = k + i + f, k + i
     if round_mode.startswith('S_'):
         round_mode = round_mode[2:]
-    c_round_mode = getattr(cppyy.gbl, f'AP_{round_mode}')
-    c_overflow_mode = getattr(cppyy.gbl, f'AP_{overflow_mode}')
+    round_mode = f'AP_{round_mode}'
+    overflow_mode = f'AP_{overflow_mode}'
 
-    print(W, I, k, c_round_mode, c_overflow_mode)
-    fn = cppyy.gbl.qkn_test.fixedq_vec[W, I, k, c_round_mode, c_overflow_mode]
+    fn = cppyy.gbl.qkn_test.fixedq[W, I, k, round_mode, overflow_mode]
 
     r = fn(x)
     return r
 
 
 def c_quantize_float(x, M, E, E0):
-    fn = cppyy.gbl.qkn_test.floatq_vec[M, E, E0]
+    fn = cppyy.gbl.qkn_test.floatq[M, E, E0]
+    r = fn(x)
+    return r
+
+
+def c_quantize_binary(x):
+    fn = cppyy.gbl.qkn_test.binaryq
+    r = fn(x)
+    return r
+
+
+def c_quantize_ternary(x):
+    fn = cppyy.gbl.qkn_test.ternaryq
     r = fn(x)
     return r
 
@@ -121,4 +133,32 @@ def test_fixed_float_mult(fixed_round_mode, fixed_overflow_mode, k, i, f, M, E, 
         Py: {mult_py[mismatch][:5]}
         fx in: {arr_c_fixed_np[mismatch][:5]}
         fp in: {arr_c_float_np[mismatch][:5]}
+    '''
+
+
+def test_binary(data, register_cpp):
+    arr_c_binary = c_quantize_binary(data)
+    arr_py_binary = binary_quantize(data)
+    arr_c_binary_np = np.array([float(x) for x in arr_c_binary])
+
+    mismatch = np.where(arr_py_binary != arr_c_binary_np)[0]
+    assert len(mismatch) == 0, f'''Binary quantizer has inconsistent behavior with C++ implementation:
+        [* {len(mismatch)} mismatches, {min(len(mismatch), 5)} shown *]
+        C++: {arr_c_binary_np[mismatch][:5]}
+        Py: {arr_py_binary[mismatch][:5]}
+        in: {data[mismatch][:5]}
+    '''
+
+
+def test_ternary(data, register_cpp):
+    arr_c_ternary = c_quantize_ternary(data)
+    arr_py_ternary = ternary_quantize(data)
+    arr_c_ternary_np = np.array([float(x) for x in arr_c_ternary])
+
+    mismatch = np.where(arr_py_ternary != arr_c_ternary_np)[0]
+    assert len(mismatch) == 0, f'''Ternary quantizer has inconsistent behavior with C++ implementation:
+        [* {len(mismatch)} mismatches, {min(len(mismatch), 5)} shown *]
+        C++: {arr_c_ternary_np[mismatch][:5]}
+        Py: {arr_py_ternary[mismatch][:5]}
+        in: {data[mismatch][:5]}
     '''
