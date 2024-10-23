@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "quantizers"
-version = "0.0.1"
+version = "0.1"
 authors = [{ name = "Chang Sun", email = "chsun@cern.ch" }]
 description = ""
 readme = "README.md"
@@ -17,7 +17,7 @@ classifiers = [
   "Programming Language :: Python :: 3",
   "Operating System :: OS Independent",
   "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
-  "Development Status :: 2 - Pre-Alpha",
+  "Development Status :: 4 - Beta",
 ]
 
 [project.urls]
@@ -39,7 +39,8 @@ docs = ["sphinx", "sphinx-rtd-theme", "myst-parser", "pyparsing"]
 
 dependencies = ["numpy"]
 
-# grad = ['keras>=3']
+grad = ['keras>=3']
+test = ['pytest', 'pytest-cov', 'pytest-xdist', 'keras>=3']
 
 [tool.pytest.ini_options]
 filterwarnings = [
