@@ -1,4 +1,3 @@
-import keras
 from keras import ops
 from keras.api.random import SeedGenerator
 

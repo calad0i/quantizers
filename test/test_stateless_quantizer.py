@@ -5,9 +5,8 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from quantizers.binary.binary_ops import binary_quantize, ternary_quantize
-from quantizers.fixed_point.fixed_point_ops import get_fixed_quantizer, round_mode_registry
-from quantizers.minifloat.float_point_ops import float_decompose, float_quantize
+from quantizers import binary_quantize, float_decompose, float_decompose_np, float_quantize, get_fixed_quantizer, ternary_quantize
+from quantizers.fixed_point.fixed_point_ops import round_mode_registry
 
 
 @pytest.fixture(scope='module')
@@ -134,6 +133,9 @@ def test_float_decompose(xxx_mee0):
     x_normal, x_subnormal, x_overflow = xxx
 
     mm, ee = float_decompose(x_normal, M, E, E0)
+    mm_, ee_ = float_decompose_np(x_normal, M, E, E0)
+    assert np.all(mm == mm_) and np.all(ee == ee_), f'Float Decompose Error @ Normal Number'
+
     xq_ = mm * 2.**ee  # type: ignore
     xq = float_quantize(x_normal, M, E, E0)
     assert jnp.all(xq == xq_), f'Float Decompose Error @ Normal Number'
@@ -141,12 +143,18 @@ def test_float_decompose(xxx_mee0):
     assert jnp.all(jnp.abs(mm) >= 1), f'Mantissa Error @ Normal Number'  # type: ignore
 
     mm, ee = float_decompose(x_subnormal, M, E, E0)
+    mm_, ee_ = float_decompose_np(x_subnormal, M, E, E0)
+    assert np.all(mm == mm_) and np.all(ee == ee_), f'Float Decompose Error @ Subnormal Number'
+
     xq_ = mm * 2.**ee  # type: ignore
     xq = float_quantize(x_subnormal, M, E, E0)
     assert jnp.all(xq == xq_), f'Float Decompose Error @ Subnormal Number'
     assert jnp.all(jnp.abs(mm) < 1), f'Mantissa Error @ Subnormal Number'  # type: ignore
 
     mm, ee = float_decompose(x_overflow, M, E, E0)
+    mm_, ee_ = float_decompose_np(x_overflow, M, E, E0)
+    assert np.all(mm == mm_) and np.all(ee == ee_), f'Float Decompose Error'
+
     xq_ = mm * 2.**ee  # type: ignore
     xq = float_quantize(x_overflow, M, E, E0)
     assert jnp.all(xq == xq_), f'Float Decompose Error'

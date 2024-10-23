@@ -3,10 +3,9 @@ from pathlib import Path
 import cppyy
 import numpy as np
 import pytest
+from keras import ops
 
-from quantizers.binary.binary_ops import binary_quantize, ternary_quantize
-from quantizers.fixed_point.fixed_point_ops import get_fixed_quantizer
-from quantizers.minifloat.float_point_ops import float_quantize
+from quantizers import BinaryQ, FixedQ, MinifloatQ, TernaryQ
 
 
 @pytest.fixture(scope='session')
@@ -20,7 +19,7 @@ def register_cpp():
 @pytest.fixture(scope='session')
 def data():
     arr = np.random.randint(-2**15, 2**15, 1000) * 2**-8
-    return arr.astype(np.float32)
+    return ops.array(arr.astype(np.float32))
 
 
 def c_quantize_fixed(x, k, i, f, round_mode, overflow_mode):
@@ -62,14 +61,19 @@ def c_quantize_ternary(x):
 def test_fixed_quantizer_forward(fixed_round_mode, fixed_overflow_mode, k, b, i, data, register_cpp):
 
     k, i, f = k, i, b - i
+    W, I = k + b, k + i
     if fixed_overflow_mode == 'WRAP_SM':
         if k == 0:
             pytest.skip('WRAP_SM does not support k=0')
         if fixed_round_mode not in ('RND_CONV', 'RND'):
             pytest.skip('WRAP_SM only supports RND-like rounding')
 
-    fixed_q = get_fixed_quantizer(fixed_round_mode, fixed_overflow_mode)
-    arr_py_fixed = np.array(fixed_q(data, float(k), float(i), float(f), False, None))
+    fixed_q = FixedQ(W, I, k, fixed_round_mode, fixed_overflow_mode)
+
+    arr_py_fixed_np = np.array(fixed_q(np.array(data)))
+    arr_py_fixed = np.array(fixed_q(data))
+    assert np.all(arr_py_fixed_np == arr_py_fixed), 'numpy / keras implementation inconsistent'
+
     arr_c_fixed = c_quantize_fixed(data, k, i, f, fixed_round_mode, fixed_overflow_mode)
     arr_c_fixed_np = np.array([float(x) for x in arr_c_fixed])
 
@@ -87,7 +91,10 @@ def test_fixed_quantizer_forward(fixed_round_mode, fixed_overflow_mode, k, b, i,
 @pytest.mark.parametrize('E0', [0, 2, 4, 8])
 def test_minifloat_quantizer_forward(M, E, E0, data, register_cpp):
 
-    arr_py_float = np.array(float_quantize(data, M, E, E0))
+    arr_py_float = np.array(MinifloatQ(M, E, E0)(data))
+    arr_py_float_np = np.array(MinifloatQ(M, E, E0)(np.array(data)))
+    assert np.all(arr_py_float_np == arr_py_float), 'numpy / keras implementation inconsistent'
+
     arr_c_float = c_quantize_float(data, M, E, E0)
     arr_c_float_np = np.array([float(x) for x in arr_c_float])
 
@@ -137,8 +144,11 @@ def test_fixed_float_mult(fixed_round_mode, fixed_overflow_mode, k, i, f, M, E, 
 
 
 def test_binary(data, register_cpp):
+    arr_py_binary = BinaryQ()(data)
+    arr_py_binary_np = np.array(BinaryQ()(np.array(data)))
+    assert np.all(arr_py_binary_np == arr_py_binary), 'numpy / keras implementation inconsistent'
+
     arr_c_binary = c_quantize_binary(data)
-    arr_py_binary = binary_quantize(data)
     arr_c_binary_np = np.array([float(x) for x in arr_c_binary])
 
     mismatch = np.where(arr_py_binary != arr_c_binary_np)[0]
@@ -151,10 +161,12 @@ def test_binary(data, register_cpp):
 
 
 def test_ternary(data, register_cpp):
-    arr_c_ternary = c_quantize_ternary(data)
-    arr_py_ternary = ternary_quantize(data)
-    arr_c_ternary_np = np.array([float(x) for x in arr_c_ternary])
+    arr_py_ternary = TernaryQ()(data)
+    arr_py_ternary_np = np.array(TernaryQ()(np.array(data)))
+    assert np.all(arr_py_ternary_np == arr_py_ternary), 'numpy / keras implementation inconsistent'
 
+    arr_c_ternary = c_quantize_ternary(data)
+    arr_c_ternary_np = np.array([float(x) for x in arr_c_ternary])
     mismatch = np.where(arr_py_ternary != arr_c_ternary_np)[0]
     assert len(mismatch) == 0, f'''Ternary quantizer has inconsistent behavior with C++ implementation:
         [* {len(mismatch)} mismatches, {min(len(mismatch), 5)} shown *]
