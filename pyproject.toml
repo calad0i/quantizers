@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "quantizers"
-version = "0.1"
+version = "1.0.0"
 authors = [{ name = "Chang Sun", email = "chsun@cern.ch" }]
 description = ""
 readme = "README.md"
@@ -17,7 +17,7 @@ classifiers = [
   "Programming Language :: Python :: 3",
   "Operating System :: OS Independent",
   "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
-  "Development Status :: 4 - Beta",
+  "Development Status :: 5 - Production/Stable",
 ]
 
 [project.urls]
@@ -34,9 +34,6 @@ package-dir = { "" = "src" }
 write_to = "src/quantizers/_version.py"
 
 [project.optional-dependencies]
-docs = ["sphinx", "sphinx-rtd-theme", "myst-parser", "pyparsing"]
-
-
 dependencies = ["numpy"]
 
 grad = ['keras>=3']

@@ -33,7 +33,7 @@ class BinaryQ:
             return binary_quantize(x)
 
     def __repr__(self):
-        return 'Binary()'  # pragma: no cover
+        return 'Binary()'
 
 
 class TernaryQ:
@@ -55,7 +55,7 @@ class TernaryQ:
             return ternary_quantize(x)
 
     def __repr__(self):
-        return 'Ternary()'  # pragma: no cover
+        return 'Ternary()'
 
 
 class FixedQ:
@@ -101,7 +101,7 @@ class FixedQ:
         return q(x, k, i, f, False, None)  # type: ignore
 
     def __repr__(self):
-        return f'Fixed(w={self.width}, i={self.integer}, s={self.signed}, r={self.rounding}, o={self.overflow})'  # pragma: no cover
+        return f'Fixed(w={self.width}, i={self.integer}, s={self.signed}, r={self.rounding}, o={self.overflow})'
 
 
 class MinifloatQ:
@@ -139,4 +139,4 @@ class MinifloatQ:
             return float_quantize(x, s, e, e0)
 
     def __repr__(self):
-        return f'Minifloat(s={self.significant}, e={self.exponent}, b={self.exponent_bias})'  # pragma: no cover
+        return f'Minifloat(s={self.significant}, e={self.exponent}, b={self.exponent_bias})'
