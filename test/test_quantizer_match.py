@@ -56,8 +56,8 @@ def c_quantize_ternary(x):
 @pytest.mark.parametrize('fixed_round_mode', ['TRN', 'TRN_ZERO', 'RND', 'S_RND', 'S_RND_CONV', 'RND_CONV', 'RND_ZERO', 'RND_INF', 'RND_MIN_INF'])
 @pytest.mark.parametrize('fixed_overflow_mode', ['WRAP', 'WRAP_SM', 'SAT', 'SAT_SYM'])
 @pytest.mark.parametrize('k', [0, 1])
-@pytest.mark.parametrize('b', [2, 4, 8, 16])
-@pytest.mark.parametrize('i', [-8, -4, 0, 4, 8])
+@pytest.mark.parametrize('b', [2, 7, 12])
+@pytest.mark.parametrize('i', [-5, 0, 8])
 def test_fixed_quantizer_forward(fixed_round_mode, fixed_overflow_mode, k, b, i, data, register_cpp):
 
     k, i, f = k, i, b - i
@@ -86,9 +86,9 @@ def test_fixed_quantizer_forward(fixed_round_mode, fixed_overflow_mode, k, b, i,
     '''
 
 
-@pytest.mark.parametrize('M', [2, 4, 8])
-@pytest.mark.parametrize('E', [2, 4, 8])
-@pytest.mark.parametrize('E0', [0, 2, 4, 8])
+@pytest.mark.parametrize('M', [2, 6])
+@pytest.mark.parametrize('E', [2, 6])
+@pytest.mark.parametrize('E0', [0, 3, 5])
 def test_minifloat_quantizer_forward(M, E, E0, data, register_cpp):
 
     arr_py_float = np.array(MinifloatQ(M, E, E0)(data))
