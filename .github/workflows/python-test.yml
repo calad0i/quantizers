@@ -21,10 +21,10 @@ jobs:
       - name: Install dependencies
         run: |
           cd $GITHUB_WORKSPACE
-          pip install '.[test]'
+          pip install -e '.[test]'
 
       - name: Run tests
-        run: pytest -n4 --cov --cov-report=xml
+        run: pytest --import-mode=importlib -n4 --cov --cov-report=xml --cov=src/quantizers
 
       - name: Upload results to Codecov
         uses: codecov/codecov-action@v4
