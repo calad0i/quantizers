@@ -1,6 +1,9 @@
 # Quantizers
 [![PyPI version](https://badge.fury.io/py/quantizers.svg)](https://badge.fury.io/py/quantizers)
 [![License](https://img.shields.io/badge/License-LGPL-blue)](LICENSE)
+[![Tests](https://github.com/calad0i/quantizers/actions/workflows/python-test.yml/badge.svg)](https://github.com/calad0i/quantizers/actions/workflows/python-test.yml)
+[![Coverage](https://img.shields.io/codecov/c/github/calad0i/quantizers)](https://app.codecov.io/gh/calad0i/quantizers)
+
 
 Hardware-oriented numerical quantizers for deep learning models, implemented in Keras v3 and NumPy. Provides bit-accurate precision matching with Vivado/Vitis HLS implementations.
 
