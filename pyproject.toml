@@ -37,7 +37,15 @@ write_to = "src/quantizers/_version.py"
 dependencies = ["numpy"]
 
 grad = ['keras>=3']
-test = ['pytest', 'pytest-cov', 'pytest-xdist', 'keras>=3']
+test = [
+  'pytest',
+  'pytest-cov',
+  'pytest-xdist',
+  'pytest-env',
+  'keras>=3.0',
+  'cppyy',
+  'jax',
+]
 
 [tool.pytest.ini_options]
 filterwarnings = [
