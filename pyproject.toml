@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "quantizers"
-version = "1.0.0post1"
+version = "1.0.1"
 authors = [{ name = "Chang Sun", email = "chsun@cern.ch" }]
 description = ""
 readme = "README.md"
