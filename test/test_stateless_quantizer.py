@@ -35,9 +35,9 @@ def xxx_mee0():
     sign = jnp.sign(x)
     x = jnp.abs(x)
     m_eps = 2.**-M
-    _max = (2 - m_eps) * 2.**(2**(E - 1) - 1 + E0)
-    _min_pos_normal = 2.**(-2**(E - 1) + E0 + 1)
-    _min_pos_subnormal = m_eps * 2.**(-2**(E - 1) + E0)
+    _max = (2 - m_eps) * 2.**(2.**(E - 1) - 1 + E0)
+    _min_pos_normal = 2.**(-2.**(E - 1) + E0 + 1)
+    _min_pos_subnormal = m_eps * 2.**(-2.**(E - 1) + E0)
     log_subnormal = jnp.log2(_min_pos_subnormal)
     log_normal = jnp.log2(_min_pos_normal)
     log_overflow = jnp.log2(_max)

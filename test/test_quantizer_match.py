@@ -18,7 +18,7 @@ def register_cpp():
 
 @pytest.fixture(scope='session')
 def data():
-    arr = np.random.randint(-2**15, 2**15, 1000) * 2**-8
+    arr = np.random.randint(-2.**15, 2.**15, 1000) * 2.**-8
     return ops.array(arr.astype(np.float32))
 
 

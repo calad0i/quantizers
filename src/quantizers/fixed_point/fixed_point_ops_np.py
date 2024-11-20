@@ -90,14 +90,14 @@ def sat_mode_np(name: str | list | tuple):
 def wrap(x, k, i, f, training=None):
     xs = x
     bk = i + k
-    bias = k * 2**(bk - 1)
-    return ((xs + bias) % (2**bk) - bias)
+    bias = k * 2.**(bk - 1)
+    return ((xs + bias) % (2.**bk) - bias)
 
 
 @sat_mode_np('SAT')
 def sat(x, k, i, f, training=None):
-    f_eps = 2**(-f)
-    __max = 2**i
+    f_eps = 2.**(-f)
+    __max = 2.**i
     _max = __max - f_eps
     _min = -__max * k
     return np.clip(x, _min, _max)
@@ -105,16 +105,16 @@ def sat(x, k, i, f, training=None):
 
 @sat_mode_np('SAT_SYM')
 def sat_sym(x, k, i, f, training=None):
-    f_eps = 2**(-f)
-    _max = 2**i - f_eps
+    f_eps = 2.**(-f)
+    _max = 2.**i - f_eps
     _min = -_max * k
     return np.clip(x, _min, _max)
 
 
 @sat_mode_np('WRAP_SM')
 def wrap_sm_fn(x, k, i, f, training=None, quant_fn: Callable = lambda x: x):
-    eps = 2**-f
-    high = 2**i - eps
+    eps = 2.**-f
+    high = 2.**i - eps
     low = -(high + eps) * k
     interval = 2 ** (i + k)
     c1 = ((x) / interval) % 2 >= 1

@@ -33,7 +33,7 @@ def float_decompose_np(x, m, e, e0=0):
     scale = 2.**(e_act - m + 1)
     sig = x / scale
     qsig = np.round(sig)
-    cond = (e_act != e_high) & (np.abs(qsig) == 2**m)
+    cond = (e_act != e_high) & (np.abs(qsig) == 2.**m)
     e_act = np.where(cond, e_act + 1, e_act)  # type: ignore
     qsig = np.where(cond, qsig / 2., qsig)  # type: ignore
     r_mantissa_bound = 2 - 2.**(-m + 1)

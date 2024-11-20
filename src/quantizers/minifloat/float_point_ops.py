@@ -47,7 +47,7 @@ def float_decompose(x, m, e, e0=0):
     scale = 2.**(e_act - m + 1)
     sig = x / scale
     qsig = ops.round(sig)
-    cond = (e_act != e_high) & (ops.abs(qsig) == 2**m)
+    cond = (e_act != e_high) & (ops.abs(qsig) == 2.**m)
     e_act = ops.where(cond, e_act + 1, e_act)  # type: ignore
     qsig = ops.where(cond, qsig / 2., qsig)  # type: ignore
     r_mantissa_bound = 2 - 2.**(-m + 1)
