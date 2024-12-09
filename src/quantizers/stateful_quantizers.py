@@ -18,12 +18,10 @@ class BinaryQ:
     """Stateful binary quantizer."""
 
     @overload
-    def __call__(self, x: T) -> np.ndarray:
-        ...  # pragma: no cover
+    def __call__(self, x: T) -> np.ndarray: ...
 
     @overload
-    def __call__(self, x: Any) -> Any:
-        ...  # pragma: no cover
+    def __call__(self, x: Any) -> Any: ...
 
     def __call__(self, x):
         use_numpy = not is_tensor(x)
@@ -40,12 +38,10 @@ class TernaryQ:
     """Stateful ternary quantizer."""
 
     @overload
-    def __call__(self, x: T) -> np.ndarray:
-        ...  # pragma: no cover
+    def __call__(self, x: T) -> np.ndarray: ...
 
     @overload
-    def __call__(self, x: Any) -> Any:
-        ...  # pragma: no cover
+    def __call__(self, x: Any) -> Any: ...
 
     def __call__(self, x):
         use_numpy = not is_tensor(x)
@@ -83,12 +79,10 @@ class FixedQ:
         self.overflow = overflow
 
     @overload
-    def __call__(self, x: T) -> np.ndarray:
-        ...  # pragma: no cover
+    def __call__(self, x: T) -> np.ndarray: ...
 
     @overload
-    def __call__(self, x: Any) -> Any:
-        ...  # pragma: no cover
+    def __call__(self, x: Any) -> Any: ...
 
     def __call__(self, x):
         use_numpy = not is_tensor(x)
@@ -123,12 +117,10 @@ class MinifloatQ:
         self.exponent_bias = exponent_bias
 
     @overload
-    def __call__(self, x: T) -> np.ndarray:
-        ...  # pragma: no cover
+    def __call__(self, x: T) -> np.ndarray: ...
 
     @overload
-    def __call__(self, x: Any) -> Any:
-        ...  # pragma: no cover
+    def __call__(self, x: Any) -> Any: ...
 
     def __call__(self, x):
         s, e, e0 = float(self.significant), float(self.exponent), float(self.exponent_bias)
