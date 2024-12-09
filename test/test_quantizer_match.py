@@ -18,7 +18,7 @@ def register_cpp():
 
 @pytest.fixture(scope='session')
 def data():
-    arr = np.random.randint(-2.**15, 2.**15, 1000) * 2.**-8
+    arr = np.random.randint(-2**15, 2**15, 1000) * 2.**-8
     return ops.array(arr.astype(np.float32))
 
 
@@ -69,6 +69,7 @@ def test_fixed_quantizer_forward(fixed_round_mode, fixed_overflow_mode, k, b, i,
             pytest.skip('WRAP_SM only supports RND-like rounding')
 
     fixed_q = FixedQ(W, I, k, fixed_round_mode, fixed_overflow_mode)
+    print(fixed_q)
 
     arr_py_fixed_np = np.array(fixed_q(np.array(data)))
     arr_py_fixed = np.array(fixed_q(data))
@@ -91,8 +92,10 @@ def test_fixed_quantizer_forward(fixed_round_mode, fixed_overflow_mode, k, b, i,
 @pytest.mark.parametrize('E0', [0, 3, 5])
 def test_minifloat_quantizer_forward(M, E, E0, data, register_cpp):
 
-    arr_py_float = np.array(MinifloatQ(M, E, E0)(data))
-    arr_py_float_np = np.array(MinifloatQ(M, E, E0)(np.array(data)))
+    q = MinifloatQ(M, E, E0)
+    print(q)
+    arr_py_float = np.array(q(data))
+    arr_py_float_np = np.array(q(np.array(data)))
     assert np.all(arr_py_float_np == arr_py_float), 'numpy / keras implementation inconsistent'
 
     arr_c_float = c_quantize_float(data, M, E, E0)
@@ -144,8 +147,10 @@ def test_fixed_float_mult(fixed_round_mode, fixed_overflow_mode, k, i, f, M, E, 
 
 
 def test_binary(data, register_cpp):
-    arr_py_binary = BinaryQ()(data)
-    arr_py_binary_np = np.array(BinaryQ()(np.array(data)))
+    q = BinaryQ()
+    print(q)
+    arr_py_binary = q(data)
+    arr_py_binary_np = np.array(q(np.array(data)))
     assert np.all(arr_py_binary_np == arr_py_binary), 'numpy / keras implementation inconsistent'
 
     arr_c_binary = c_quantize_binary(data)
@@ -161,8 +166,10 @@ def test_binary(data, register_cpp):
 
 
 def test_ternary(data, register_cpp):
-    arr_py_ternary = TernaryQ()(data)
-    arr_py_ternary_np = np.array(TernaryQ()(np.array(data)))
+    q = TernaryQ()
+    print(q)
+    arr_py_ternary = q(data)
+    arr_py_ternary_np = np.array(q(np.array(data)))
     assert np.all(arr_py_ternary_np == arr_py_ternary), 'numpy / keras implementation inconsistent'
 
     arr_c_ternary = c_quantize_ternary(data)

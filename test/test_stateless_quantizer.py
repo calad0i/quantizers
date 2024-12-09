@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from quantizers import binary_quantize, float_decompose, float_decompose_np, float_quantize, get_fixed_quantizer, ternary_quantize
-from quantizers.fixed_point.fixed_point_ops import round_mode_registry
+from quantizers.fixed_point._fixed_point_ops import round_mode_registry
 
 
 @pytest.fixture(scope='module')
