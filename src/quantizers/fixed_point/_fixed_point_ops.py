@@ -218,11 +218,12 @@ def _get_fixed_quantizer(
         """Stateless fixed-point quantizer.
         Args:
             x: input tensor
-            k: number of fractional bits
+            k: keep negative values; 0 for unsigned
             i: number of integer bits
             f: number of fractional bits
             training: training mode
         """
+        i = ops.cast(i, x.dtype)  # type: ignore
         i = ops.stop_gradient(ops.maximum(i, -f)) + (i - ops.stop_gradient(i))  # type: ignore
 
         if overflow_mode == 'WRAP_SM':
