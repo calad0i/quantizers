@@ -223,7 +223,6 @@ def _get_fixed_quantizer(
             f: number of fractional bits
             training: training mode
         """
-        i = ops.cast(i, x.dtype)  # type: ignore
         i = ops.stop_gradient(ops.maximum(i, -f)) + (i - ops.stop_gradient(i))  # type: ignore
 
         if overflow_mode == 'WRAP_SM':
