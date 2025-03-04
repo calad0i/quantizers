@@ -66,7 +66,7 @@ def test_fixed_quantizer_forward(fixed_round_mode, fixed_overflow_mode, k, b, i,
     if fixed_overflow_mode == 'WRAP_SM':
         if k == 0:
             pytest.skip('WRAP_SM does not support k=0')
-        if fixed_round_mode not in ('RND_CONV', 'RND'):
+        if fixed_round_mode not in ('RND_CONV', 'RND', 'S_RND', 'S_RND_CONV'):
             pytest.skip('WRAP_SM only supports RND-like rounding')
 
     fixed_q = FixedQ(W, I, k, fixed_round_mode, fixed_overflow_mode)
@@ -74,6 +74,13 @@ def test_fixed_quantizer_forward(fixed_round_mode, fixed_overflow_mode, k, b, i,
 
     arr_py_fixed_np = np.array(fixed_q(np.array(data)))
     arr_py_fixed = np.array(fixed_q(data))
+    mismatch = np.where(arr_py_fixed_np != arr_py_fixed)[0]
+    assert len(mismatch) == 0, f"""Fixed quantizer has inconsistent behavior with numpy implementation:
+        [* {len(mismatch)} mismatches, {min(len(mismatch), 5)} shown *]
+        np: {arr_py_fixed_np[mismatch][:5]}
+        keras: {arr_py_fixed[mismatch][:5]}
+        in: {data[mismatch][:5] * 2.0**8}
+    """
     assert np.all(arr_py_fixed_np == arr_py_fixed), 'numpy / keras implementation inconsistent'
 
     arr_c_fixed = c_quantize_fixed(data, k, i, f, fixed_round_mode, fixed_overflow_mode)

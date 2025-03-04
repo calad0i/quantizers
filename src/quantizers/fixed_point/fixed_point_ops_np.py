@@ -135,12 +135,8 @@ def get_fixed_quantizer_np(round_mode: str = 'TRN', overflow_mode: str = 'WRAP')
     overflow_mode = overflow_mode.upper()
     round_mode = round_mode[2:] if round_mode.startswith('S_') else round_mode
 
-    round_fn_scaled = round_mode_registry_scaled_np.get(round_mode, None)
-    if round_fn_scaled is None:
-        raise ValueError(f'Unknown rounding mode: {round_mode}')
-    sat_fn = saturation_mode_registry_np.get(overflow_mode, None)
-    if sat_fn is None:
-        raise ValueError(f'Unknown saturation mode: {overflow_mode}')
+    round_fn_scaled = round_mode_registry_scaled_np[round_mode]
+    sat_fn = saturation_mode_registry_np[overflow_mode]
 
     if overflow_mode == 'WRAP_SM':
         assert round_mode in ('RND', 'RND_CONV'), 'WRAP_SM only supports RND and RND_CONV rounding modes in this implementation.'
