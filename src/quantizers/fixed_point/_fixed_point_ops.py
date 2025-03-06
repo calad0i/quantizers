@@ -1,7 +1,7 @@
 from collections.abc import Callable
+from functools import wraps
 from typing import Any, TypeVar
 
-import keras
 from keras import ops
 from keras.api.random import SeedGenerator
 from numpy.typing import ArrayLike
@@ -21,8 +21,14 @@ def _clip(x, min_value, max_value):
 def rnd_mode(name: str):
     def inner(func):
         assert name not in round_mode_registry, f"Round mode '{name}' already exists."
-        round_mode_registry[name] = func
-        return func
+
+        @wraps(func)
+        def wrapper(x):
+            xq = func(x)
+            return ops.stop_gradient(xq) + (x - ops.stop_gradient(x))
+
+        round_mode_registry[name] = wrapper
+        return wrapper
 
     return inner
 
@@ -133,15 +139,15 @@ def wrap_sm_fn(x, k, i, f, training=None, quant_fn: Callable = lambda x: x):
 
 class FixedPointQuantizer:
     def round(self, x, f: Any = 1.0, stochastic: bool | None = None, seed_gen: SeedGenerator | None = None):
-        x = x * 2.0**f
+        scale = 2.0**f
+        x = x * scale
         xq = self.round_fn(x)
-        xq = ops.stop_gradient(xq - x) + x
-        if stochastic:
-            noise = keras.random.uniform(ops.shape(x), -0.49, 0.49, seed=seed_gen)
-            x = x + noise
-            xq2 = self.round_fn(x)
-            xq = xq + ops.stop_gradient(xq2 - xq)
-        xq = xq / 2.0**f
+        # if stochastic:
+        #     noise = keras.random.uniform(ops.shape(x), -0.49, 0.49, seed=seed_gen)
+        #     x = x + noise
+        #     xq2 = self.round_fn(x)
+        #     xq = xq + ops.stop_gradient(xq2 - xq)
+        xq = xq / scale
         return xq
 
     def saturate(self, x, k, i, f):
@@ -168,7 +174,6 @@ class FixedPointQuantizer:
         sat_fn = saturation_mode_registry[overflow_mode]
         self.sat_fn = sat_fn
         self.round_fn = round_fn
-        self.forward
 
     def forward(self, x, k, i, f, training=False, seed_gen=None):
         # Workaround for gradient computation around 0.
