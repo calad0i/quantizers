@@ -117,7 +117,7 @@ def wrap_sm_fn(x, k, i, f, training=None, quant_fn: Callable = lambda x: x):
     eps = 2.0**-f
     high = 2.0**i - eps
     low = -(high + eps) * k
-    interval = 2 ** (i + k)
+    interval = 2.0 ** (i + k)
     c1 = ((x) / interval) % 2 >= 1
     c1 = c1 & (np.abs(x) > eps / 2)
     c2 = ((x + eps / 2) / (interval / 2)) % 2 >= 1
