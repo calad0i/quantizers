@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "quantizers"
-version = "1.2.0"
+version = "1.2.1"
 authors = [{ name = "Chang Sun", email = "chsun@cern.ch" }]
 description = ""
 readme = "README.md"
@@ -36,7 +36,7 @@ write_to = "src/quantizers/_version.py"
 [project.optional-dependencies]
 dependencies = ["numpy"]
 
-grad = ['keras>=3']
+grad = ['keras>=3.10']
 test = [
   'pytest',
   'pytest-cov',

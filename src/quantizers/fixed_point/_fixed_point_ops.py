@@ -3,7 +3,7 @@ from functools import wraps
 from typing import Any, TypeVar
 
 from keras import ops
-from keras.api.random import SeedGenerator
+from keras.random import SeedGenerator
 from numpy.typing import ArrayLike
 
 round_mode_registry: dict[str, Callable[[Any], Any]] = {}

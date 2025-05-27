@@ -87,11 +87,11 @@ class FixedQ:
     def __call__(self, x):
         use_numpy = not is_tensor(x)
         k, i, f = self.signed, self.integer - self.signed, self.width - self.integer
-        k, i, f = float(k), float(i), float(f)
+        # k, i, f = float(k), float(i), float(f)
         if use_numpy:
             q = get_fixed_quantizer_np(self.rounding, self.overflow)
         else:
-            from keras.api import ops
+            from keras import ops
 
             k, i, f = ops.convert_to_tensor(k), ops.convert_to_tensor(i), ops.convert_to_tensor(f)
             q = get_fixed_quantizer(self.rounding, self.overflow)
@@ -131,7 +131,7 @@ class MinifloatQ:
         if use_numpy:
             return float_quantize_np(x, s, e, e0)
         else:
-            from keras.api import ops
+            from keras import ops
 
             s, e, e0 = ops.convert_to_tensor(s), ops.convert_to_tensor(e), ops.convert_to_tensor(e0)
             return float_quantize(x, s, e, e0)

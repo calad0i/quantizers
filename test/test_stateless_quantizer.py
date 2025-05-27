@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from keras.api.random import SeedGenerator
+from keras.random import SeedGenerator
 
 from quantizers import (
     binary_quantize,
