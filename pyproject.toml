@@ -20,6 +20,17 @@ classifiers = [
   "Development Status :: 5 - Production/Stable",
 ]
 
+dependencies = ["numpy"]
+optional-dependencies.grad = ['keras>=3.10']
+optional-dependencies.test = [
+  'pytest',
+  'pytest-cov',
+  'pytest-xdist',
+  'pytest-env',
+  'keras>=3.0',
+  'cppyy',
+  'jax',
+]
 [project.urls]
 repository = "https://github.com/calad0i/quantizers"
 
@@ -33,19 +44,6 @@ package-dir = { "" = "src" }
 [tool.setuptools_scm]
 write_to = "src/quantizers/_version.py"
 
-[project.optional-dependencies]
-dependencies = ["numpy"]
-
-grad = ['keras>=3.10']
-test = [
-  'pytest',
-  'pytest-cov',
-  'pytest-xdist',
-  'pytest-env',
-  'keras>=3.0',
-  'cppyy',
-  'jax',
-]
 
 [tool.pytest.ini_options]
 filterwarnings = [

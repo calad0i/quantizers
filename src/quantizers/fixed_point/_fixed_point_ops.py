@@ -142,11 +142,6 @@ class FixedPointQuantizer:
         scale = 2.0**f
         x = x * scale
         xq = self.round_fn(x)
-        # if stochastic:
-        #     noise = keras.random.uniform(ops.shape(x), -0.49, 0.49, seed=seed_gen)
-        #     x = x + noise
-        #     xq2 = self.round_fn(x)
-        #     xq = xq + ops.stop_gradient(xq2 - xq)
         xq = xq / scale
         return xq
 
