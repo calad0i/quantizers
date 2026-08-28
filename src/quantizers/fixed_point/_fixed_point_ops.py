@@ -108,6 +108,16 @@ def sat(x, k, i, f):
     return r
 
 
+@sat_mode('SAT_ZERO')
+def sat_zero(x, k, i, f):
+    f_eps = 2.0 ** (-f)
+    __max = 2.0**i
+    _max = __max - f_eps
+    _min = -__max * k
+    overflow = ops.logical_or(x > _max, x < _min)
+    return ops.where(overflow, ops.zeros_like(x), x)
+
+
 @sat_mode('SAT_SYM')
 def sat_sym(x, k, i, f):
     f_eps = 2.0 ** (-f)
@@ -175,10 +185,10 @@ class FixedPointQuantizer:
         # When have values outside boundary rounded to boundary, grad on f presents despite the value will be clipped off anyway.
         # Thus have saturation before rounding, except for wrap mode, which doesn't round during training.
 
-        if self.overflow_mode != 'WRAP':
+        if self.overflow_mode not in ('WRAP', 'SAT_ZERO'):
             x = self.saturate(x, k, i, f)
         x = self.round(x, f, self.stochastic and training, seed_gen)
-        if self.overflow_mode == 'WRAP' and not training:
+        if self.overflow_mode in ('WRAP', 'SAT_ZERO') and not training:
             x = self.saturate(x, k, i, f)
         return x
 

@@ -56,7 +56,7 @@ def c_quantize_ternary(x):
 @pytest.mark.parametrize(
     'fixed_round_mode', ['TRN', 'TRN_ZERO', 'RND', 'S_RND', 'S_RND_CONV', 'RND_CONV', 'RND_ZERO', 'RND_INF', 'RND_MIN_INF']
 )
-@pytest.mark.parametrize('fixed_overflow_mode', ['WRAP', 'WRAP_SM', 'SAT', 'SAT_SYM'])
+@pytest.mark.parametrize('fixed_overflow_mode', ['WRAP', 'WRAP_SM', 'SAT', 'SAT_ZERO', 'SAT_SYM'])
 @pytest.mark.parametrize('k', [0, 1])
 @pytest.mark.parametrize('b', [2, 7, 12])
 @pytest.mark.parametrize('i', [-5, 0, 8])

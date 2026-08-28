@@ -59,7 +59,7 @@ def xxx_mee0():
 @pytest.mark.parametrize(
     'round_mode', ['TRN', 'TRN_ZERO', 'RND', 'S_RND', 'RND_CONV', 'S_RND_CONV', 'RND_ZERO', 'RND_INF', 'RND_MIN_INF']
 )
-@pytest.mark.parametrize('overflow_mode', ['WRAP', 'SAT', 'SAT_SYM', 'WRAP_SM'])
+@pytest.mark.parametrize('overflow_mode', ['WRAP', 'SAT', 'SAT_ZERO', 'SAT_SYM', 'WRAP_SM'])
 def test_fixed_quantizer_grad(round_mode, overflow_mode, x_kif):
     if round_mode not in ('RND', 'RND_CONV') and overflow_mode == 'WRAP_SM':
         pytest.skip('Not supported')
@@ -71,7 +71,7 @@ def test_fixed_quantizer_grad(round_mode, overflow_mode, x_kif):
     x, k, i, f = x_kif
 
     xq = quantizer(x, k, i, f, True, seed)  # type: ignore
-    if 'WRAP' not in overflow_mode and not round_mode.startswith('S_'):
+    if 'WRAP' not in overflow_mode and overflow_mode != 'SAT_ZERO' and not round_mode.startswith('S_'):
         xq1 = quantizer(x, k, i, f, False)  # type: ignore
         assert jnp.all(xq == xq1)
 
@@ -82,7 +82,7 @@ def test_fixed_quantizer_grad(round_mode, overflow_mode, x_kif):
 
     dx, di, df = jax.grad(abs_quantization_err, (0, 2, 3))(x, 1, i, f)
 
-    if overflow_mode == 'WRAP':
+    if overflow_mode in ('WRAP', 'SAT_ZERO'):
         assert jnp.all(dx == 0), 'X grad Error'
         assert jnp.all(di == 0), 'I grad Error'
         assert jnp.all(df < 0), 'F grad Error'

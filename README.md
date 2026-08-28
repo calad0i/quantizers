@@ -28,7 +28,7 @@ Parameters:
 Supported modes:
 - Rounding: `TRN`, `RND`, `RND_CONV`, `TRN_ZERO`, `RND_ZERO`, `RND_MIN_INF`, `RND_INF`
   - `S_RND` and `S_RND_CONV` for stochastic rounding; Not available in NumPy implementation as it is for training only
-- Overflow: `WRAP`, `SAT`, `SAT_SYM`, `WRAP_SM`
+- Overflow: `WRAP`, `SAT`, `SAT_ZERO`, `SAT_SYM`, `WRAP_SM`
 
 Limitations:
 - `WRAP_SM` only works with `RND` or `RND_CONV` rounding

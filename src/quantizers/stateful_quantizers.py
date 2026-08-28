@@ -68,7 +68,7 @@ class FixedQ:
     rounding : str, optional
         The rounding method to use, by default 'TRN'. Available options are 'TRN', 'TRN_ZERO', 'RND', 'S_RND', 'S_RND_CONV', 'RND_CONV', 'RND_ZERO', 'RND_INF', 'RND_MIN_INF'.
     overflow : str, optional
-        The overflow handling method to use, by default 'WRAP'. Available options are 'WRAP', 'SAT', 'SAT_SYM', 'WRAP_SM'.
+        The overflow handling method to use, by default 'WRAP'. Available options are 'WRAP', 'SAT', 'SAT_ZERO', 'SAT_SYM', 'WRAP_SM'.
     """
 
     def __init__(self, width: int, integer: int, signed: bool | int = True, rounding: str = 'TRN', overflow: str = 'WRAP'):
