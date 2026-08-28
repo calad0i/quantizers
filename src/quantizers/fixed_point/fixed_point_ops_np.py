@@ -104,6 +104,16 @@ def sat(x, k, i, f, training=None):
     return np.clip(x, _min, _max)
 
 
+@sat_mode_np('SAT_ZERO')
+def sat_zero(x, k, i, f, training=None):
+    f_eps = 2.0 ** (-f)
+    __max = 2.0**i
+    _max = __max - f_eps
+    _min = -__max * k
+    overflow = (x > _max) | (x < _min)
+    return np.where(overflow, 0.0, x)
+
+
 @sat_mode_np('SAT_SYM')
 def sat_sym(x, k, i, f, training=None):
     f_eps = 2.0 ** (-f)
@@ -153,10 +163,10 @@ def get_fixed_quantizer_np(round_mode: str = 'TRN', overflow_mode: str = 'WRAP')
 
             return wrap_sm_fn(x, k, _i, f, training, rnd_fn_wrapped)
 
-        if overflow_mode != 'WRAP':
+        if overflow_mode not in ('WRAP', 'SAT_ZERO'):
             x = sat_fn(x, k, _i, f, training)
         x = round_fn_scaled(x, f, training)
-        if overflow_mode == 'WRAP':
+        if overflow_mode in ('WRAP', 'SAT_ZERO'):
             x = sat_fn(x, k, _i, f, training)
         return x
 
