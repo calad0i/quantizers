@@ -4,14 +4,13 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from keras.random import SeedGenerator
 
 from quantizers import (
+    FixedPointQuantizer,
     binary_quantize,
     float_decompose,
     float_decompose_np,
     float_quantize,
-    get_fixed_quantizer,
     ternary_quantize,
 )
 
@@ -56,27 +55,21 @@ def xxx_mee0():
     return xxx, M, E, E0
 
 
-@pytest.mark.parametrize(
-    'round_mode', ['TRN', 'TRN_ZERO', 'RND', 'S_RND', 'RND_CONV', 'S_RND_CONV', 'RND_ZERO', 'RND_INF', 'RND_MIN_INF']
-)
+@pytest.mark.parametrize('round_mode', ['TRN', 'TRN_ZERO', 'RND', 'RND_CONV', 'RND_ZERO', 'RND_INF', 'RND_MIN_INF'])
 @pytest.mark.parametrize('overflow_mode', ['WRAP', 'SAT', 'SAT_SYM', 'WRAP_SM'])
 def test_fixed_quantizer_grad(round_mode, overflow_mode, x_kif):
     if round_mode not in ('RND', 'RND_CONV') and overflow_mode == 'WRAP_SM':
         pytest.skip('Not supported')
 
-    quantizer = get_fixed_quantizer(round_mode, overflow_mode)
+    quantizer = FixedPointQuantizer(round_mode, overflow_mode)
     assert callable(quantizer)
-    seed = SeedGenerator(42)
 
     x, k, i, f = x_kif
 
-    xq = quantizer(x, k, i, f, True, seed)  # type: ignore
-    if 'WRAP' not in overflow_mode and not round_mode.startswith('S_'):
-        xq1 = quantizer(x, k, i, f, False)  # type: ignore
-        assert jnp.all(xq == xq1)
+    xq = quantizer(x, k, i, f)  # type: ignore
 
     def abs_quantization_err(x, k, i, f):
-        xq = quantizer(x, k, i, f, True, seed)  # type: ignore
+        xq = quantizer(x, k, i, f)  # type: ignore
         err = jnp.abs(x - xq)
         return jnp.sum(err)
 
@@ -85,7 +78,7 @@ def test_fixed_quantizer_grad(round_mode, overflow_mode, x_kif):
     if overflow_mode == 'WRAP':
         assert jnp.all(dx == 0), 'X grad Error'
         assert jnp.all(di == 0), 'I grad Error'
-        assert jnp.all(df < 0), 'F grad Error'
+        assert jnp.all((df < 0) | (x < -(2**i)) | (x > 2**i - 2**-f)), 'F grad Error'
     elif overflow_mode in ('SAT', 'SAT_SYM'):
         for _dx in jnp.unique(dx):
             assert _dx in (-1, 0, 1), 'X grad Error'

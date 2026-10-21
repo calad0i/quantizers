@@ -66,7 +66,7 @@ class FixedQ:
     signed : bool|int
         Whether the quantized number is signed.
     rounding : str, optional
-        The rounding method to use, by default 'TRN'. Available options are 'TRN', 'TRN_ZERO', 'RND', 'S_RND', 'S_RND_CONV', 'RND_CONV', 'RND_ZERO', 'RND_INF', 'RND_MIN_INF'.
+        The rounding method to use, by default 'TRN'. Available options are 'TRN', 'TRN_ZERO', 'RND', 'RND_CONV', 'RND_ZERO', 'RND_INF', 'RND_MIN_INF'.
     overflow : str, optional
         The overflow handling method to use, by default 'WRAP'. Available options are 'WRAP', 'SAT', 'SAT_SYM', 'WRAP_SM'.
     """
@@ -94,8 +94,8 @@ class FixedQ:
             from keras import ops
 
             k, i, f = ops.convert_to_tensor(k), ops.convert_to_tensor(i), ops.convert_to_tensor(f)
-            q = get_fixed_quantizer(self.rounding, self.overflow)
-        return q(x, k, i, f, False, None)  # type: ignore
+            q = FixedPointQuantizer(self.rounding, self.overflow)
+        return q(x, k, i, f)  # type: ignore
 
     def __repr__(self):
         return f'Fixed(w={self.width}, i={self.integer}, s={self.signed}, r={self.rounding}, o={self.overflow})'
