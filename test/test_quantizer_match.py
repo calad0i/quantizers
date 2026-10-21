@@ -24,8 +24,6 @@ def data():
 
 def c_quantize_fixed(x, k, i, f, round_mode, overflow_mode):
     W, I = k + i + f, k + i
-    if round_mode.startswith('S_'):
-        round_mode = round_mode[2:]
     round_mode = f'AP_{round_mode}'
     overflow_mode = f'AP_{overflow_mode}'
 
@@ -53,9 +51,7 @@ def c_quantize_ternary(x):
     return r
 
 
-@pytest.mark.parametrize(
-    'fixed_round_mode', ['TRN', 'TRN_ZERO', 'RND', 'S_RND', 'S_RND_CONV', 'RND_CONV', 'RND_ZERO', 'RND_INF', 'RND_MIN_INF']
-)
+@pytest.mark.parametrize('fixed_round_mode', ['TRN', 'TRN_ZERO', 'RND', 'RND_CONV', 'RND_ZERO', 'RND_INF', 'RND_MIN_INF'])
 @pytest.mark.parametrize('fixed_overflow_mode', ['WRAP', 'WRAP_SM', 'SAT', 'SAT_SYM'])
 @pytest.mark.parametrize('k', [0, 1])
 @pytest.mark.parametrize('b', [2, 7, 12])
@@ -66,7 +62,7 @@ def test_fixed_quantizer_forward(fixed_round_mode, fixed_overflow_mode, k, b, i,
     if fixed_overflow_mode == 'WRAP_SM':
         if k == 0:
             pytest.skip('WRAP_SM does not support k=0')
-        if fixed_round_mode not in ('RND_CONV', 'RND', 'S_RND', 'S_RND_CONV'):
+        if fixed_round_mode not in ('RND_CONV', 'RND'):
             pytest.skip('WRAP_SM only supports RND-like rounding')
 
     fixed_q = FixedQ(W, I, k, fixed_round_mode, fixed_overflow_mode)

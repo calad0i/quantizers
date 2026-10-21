@@ -4,8 +4,8 @@ from typing import Any, TypeVar
 import numpy as np
 
 round_mode_registry_np: dict[str, Callable[[Any, bool | None], Any]] = {}
-round_mode_registry_scaled_np: dict[str, Callable[[Any, Any, bool | None], Any]] = {}
-saturation_mode_registry_np: dict[str, Callable[[Any, Any, Any, Any, bool | None], Any]] = {}
+round_mode_registry_scaled_np: dict[str, Callable[[Any, Any], Any]] = {}
+saturation_mode_registry_np: dict[str, Callable[[Any, Any, Any, Any], Any]] = {}
 
 T = TypeVar('T', bound=np.ndarray)
 
@@ -14,7 +14,7 @@ def rnd_mode_np(names: str | list[str] | tuple[str, ...]):
     names = (names,) if isinstance(names, str) else names
 
     def inner(func):
-        def wrapper(x, f, training=None, seed_gen=None):
+        def wrapper(x, f):
             scale = 2.0**f
             sx = x * scale
             sxq = func(sx)
@@ -88,7 +88,7 @@ def sat_mode_np(name: str | list | tuple):
 
 
 @sat_mode_np('WRAP')
-def wrap(x, k, i, f, training=None):
+def wrap(x, k, i, f):
     xs = x
     bk = i + k
     bias = k * 2.0 ** (bk - 1)
@@ -96,7 +96,7 @@ def wrap(x, k, i, f, training=None):
 
 
 @sat_mode_np('SAT')
-def sat(x, k, i, f, training=None):
+def sat(x, k, i, f):
     f_eps = 2.0 ** (-f)
     __max = 2.0**i
     _max = __max - f_eps
@@ -105,7 +105,7 @@ def sat(x, k, i, f, training=None):
 
 
 @sat_mode_np('SAT_SYM')
-def sat_sym(x, k, i, f, training=None):
+def sat_sym(x, k, i, f):
     f_eps = 2.0 ** (-f)
     _max = 2.0**i - f_eps
     _min = -_max * k
@@ -113,7 +113,7 @@ def sat_sym(x, k, i, f, training=None):
 
 
 @sat_mode_np('WRAP_SM')
-def wrap_sm_fn(x, k, i, f, training=None, quant_fn: Callable = lambda x: x):
+def wrap_sm_fn(x, k, i, f, quant_fn: Callable = lambda x: x):
     eps = 2.0**-f
     high = 2.0**i - eps
     low = -(high + eps) * k
@@ -133,7 +133,6 @@ def wrap_sm_fn(x, k, i, f, training=None, quant_fn: Callable = lambda x: x):
 def get_fixed_quantizer_np(round_mode: str = 'TRN', overflow_mode: str = 'WRAP'):
     round_mode = round_mode.upper()
     overflow_mode = overflow_mode.upper()
-    round_mode = round_mode[2:] if round_mode.startswith('S_') else round_mode
 
     round_fn_scaled = round_mode_registry_scaled_np[round_mode]
     sat_fn = saturation_mode_registry_np[overflow_mode]
@@ -141,23 +140,21 @@ def get_fixed_quantizer_np(round_mode: str = 'TRN', overflow_mode: str = 'WRAP')
     if overflow_mode == 'WRAP_SM':
         assert round_mode in ('RND', 'RND_CONV'), 'WRAP_SM only supports RND and RND_CONV rounding modes in this implementation.'
 
-    def quantizer(x: T, k: T, i: T, f: T, training: bool | None = False, seed_gen: None = None) -> np.ndarray:
-        assert not training, 'Training mode not supported in numpy implementation.'
-
+    def quantizer(x: T, k: T, i: T, f: T) -> np.ndarray:
         _i = np.maximum(i, -f)
 
         if overflow_mode == 'WRAP_SM':
 
             def rnd_fn_wrapped(x):
-                return round_fn_scaled(x, f, training)
+                return round_fn_scaled(x, f)
 
-            return wrap_sm_fn(x, k, _i, f, training, rnd_fn_wrapped)
+            return wrap_sm_fn(x, k, _i, f, rnd_fn_wrapped)
 
         if overflow_mode != 'WRAP':
-            x = sat_fn(x, k, _i, f, training)
-        x = round_fn_scaled(x, f, training)
+            x = sat_fn(x, k, _i, f)
+        x = round_fn_scaled(x, f)
         if overflow_mode == 'WRAP':
-            x = sat_fn(x, k, _i, f, training)
+            x = sat_fn(x, k, _i, f)
         return x
 
     return quantizer
