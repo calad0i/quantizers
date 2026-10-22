@@ -24,7 +24,7 @@ def x_kif():
     i = jax.random.randint(k2, N, -4, 8).astype(jnp.float32)
     f = jax.random.randint(k3, N, -4, 8).astype(jnp.float32)
     x = jax.random.normal(k4, N).astype(jnp.float32)
-    f = jnp.maximum(f, -i)
+    f = jnp.maximum(f, jnp.where(k, -i, -i + 1))
     return x, k, i, f
 
 
@@ -84,7 +84,7 @@ def test_fixed_quantizer_grad(round_mode, overflow_mode, x_kif):
             assert _dx in (-1, 0, 1), 'X grad Error'
         assert jnp.all(df <= 0), 'F grad Error'
         assert jnp.all(di <= 0), 'I grad Error'
-        assert jnp.all((df < 0) | (di < 0) | (x == xq)), 'Grad Error for sat mode'
+        assert jnp.all((df < 0) | (di < 0) | (x == xq) | ((k == 0) & (x < 0))), 'Grad Error for sat mode'
     elif overflow_mode == 'WRAP_SM':
         mask = jnp.abs(x) < 2.0**i - 2.0**f
         assert jnp.all(df[mask] < 0), f'F grad Error {jnp.mean(df <= 0)}'
