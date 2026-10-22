@@ -12,9 +12,10 @@ T = TypeVar('T', bound=ArrayLike)
 
 
 def _clip(x, min_value, max_value):
-    mask_overflow = x > max_value
-    mask_underflow = x < min_value
-    return ops.where(mask_overflow, max_value, ops.where(mask_underflow, min_value, x))
+    r = ops.where(x > max_value, max_value, ops.where(x < min_value, min_value, x))
+    r = r + ops.where(x == min_value, min_value - ops.stop_gradient(min_value), 0.0)  # type: ignore
+    r = r + ops.where(x == max_value, max_value - ops.stop_gradient(max_value), 0.0)  # type: ignore
+    return r
 
 
 def rnd_mode(name: str):
