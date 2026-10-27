@@ -2,16 +2,11 @@ from typing import Any, TypeVar, overload
 
 import numpy as np
 
-from .binary import *
-from .fixed_point import *
-from .minifloat import *
+from .binary import binary_quantize, ternary_quantize
+from .fixed_point import FixedPointQuantizer
+from .minifloat import float_quantize
 
 T = TypeVar('T', np.ndarray, float, int)
-
-
-def is_tensor(x):
-    base_module = x.__class__.__module__.split('.', 1)[0]
-    return base_module in ('tensorflow', 'torch', 'jaxlib')
 
 
 class BinaryQ:
@@ -24,11 +19,7 @@ class BinaryQ:
     def __call__(self, x: Any) -> Any: ...
 
     def __call__(self, x):
-        use_numpy = not is_tensor(x)
-        if use_numpy:
-            return binary_quantize_np(x)
-        else:
-            return binary_quantize(x)
+        return binary_quantize(x)
 
     def __repr__(self):
         return 'Binary()'
@@ -44,11 +35,7 @@ class TernaryQ:
     def __call__(self, x: Any) -> Any: ...
 
     def __call__(self, x):
-        use_numpy = not is_tensor(x)
-        if use_numpy:
-            return ternary_quantize_np(x)
-        else:
-            return ternary_quantize(x)
+        return ternary_quantize(x)
 
     def __repr__(self):
         return 'Ternary()'
@@ -85,17 +72,8 @@ class FixedQ:
     def __call__(self, x: Any) -> Any: ...
 
     def __call__(self, x):
-        use_numpy = not is_tensor(x)
         k, i, f = self.signed, self.integer - self.signed, self.width - self.integer
-        # k, i, f = float(k), float(i), float(f)
-        if use_numpy:
-            q = get_fixed_quantizer_np(self.rounding, self.overflow)
-        else:
-            from keras import ops
-
-            k, i, f = ops.convert_to_tensor(k), ops.convert_to_tensor(i), ops.convert_to_tensor(f)
-            q = FixedPointQuantizer(self.rounding, self.overflow)
-        return q(x, k, i, f)  # type: ignore
+        return FixedPointQuantizer(self.rounding, self.overflow)(x, k, i, f)
 
     def __repr__(self):
         return f'Fixed(w={self.width}, i={self.integer}, s={self.signed}, r={self.rounding}, o={self.overflow})'
@@ -127,14 +105,7 @@ class MinifloatQ:
 
     def __call__(self, x):
         s, e, e0 = float(self.significant), float(self.exponent), float(self.exponent_bias)
-        use_numpy = not is_tensor(x)
-        if use_numpy:
-            return float_quantize_np(x, s, e, e0)
-        else:
-            from keras import ops
-
-            s, e, e0 = ops.convert_to_tensor(s), ops.convert_to_tensor(e), ops.convert_to_tensor(e0)
-            return float_quantize(x, s, e, e0)
+        return float_quantize(x, s, e, e0)
 
     def __repr__(self):
         return f'Minifloat(s={self.significant}, e={self.exponent}, b={self.exponent_bias})'

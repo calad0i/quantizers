@@ -36,7 +36,6 @@ write_to = "src/quantizers/_version.py"
 [project.optional-dependencies]
 dependencies = ["numpy"]
 
-grad = ['keras>=3.10']
 test = [
   'pytest',
   'pytest-cov',
@@ -60,7 +59,6 @@ filterwarnings = [
 ]
 
 env = [
-  "KERAS_BACKEND=jax",
   "JAX_PLATFORMS=cpu",
   "CUDA_VISIBLE_DEVICES=-1",
   "CLING_ENABLE_CUDA=0",
