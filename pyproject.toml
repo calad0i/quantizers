@@ -58,7 +58,6 @@ filterwarnings = [
 ]
 
 env = [
-  "KERAS_BACKEND=jax",
   "JAX_PLATFORMS=cpu",
   "CUDA_VISIBLE_DEVICES=-1",
   "CLING_ENABLE_CUDA=0",

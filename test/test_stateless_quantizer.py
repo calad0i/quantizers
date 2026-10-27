@@ -9,7 +9,6 @@ from quantizers import (
     FixedPointQuantizer,
     binary_quantize,
     float_decompose,
-    float_decompose_np,
     float_quantize,
     ternary_quantize,
 )
@@ -120,6 +119,10 @@ def test_float_quantizer_grad(xxx_mee0):
     assert jnp.all(dm == 0), 'Overflow Number M grad Error'
     assert jnp.all(de < 0), f'Overflow Number E grad Error: max={jnp.max(de)}>0'
     assert jnp.all(de0 < 0), f'Overflow Number E0 grad Error: max={jnp.max(de0)}>0'
+
+
+def float_decompose_np(*args):
+    return float_decompose(*(np.asarray(a) for a in args))
 
 
 def test_float_decompose(xxx_mee0):

@@ -1,80 +1,67 @@
 from collections.abc import Callable
-from functools import wraps
-from typing import Any, TypeVar
+from typing import Any
 
-from keras import ops
-from numpy.typing import ArrayLike
+from .._backends import AbstractBackend, get_backend
 
-round_mode_registry: dict[str, Callable[[Any], Any]] = {}
-saturation_mode_registry: dict[str, Callable[[Any, Any, Any, Any], Any]] = {}
-
-T = TypeVar('T', bound=ArrayLike)
-
-
-def _clip(x, min_value, max_value):
-    r = ops.where(x > max_value, max_value, ops.where(x < min_value, min_value, x))
-    r = r + ops.where(x == min_value, min_value - ops.stop_gradient(min_value), 0.0)  # type: ignore
-    r = r + ops.where(x == max_value, max_value - ops.stop_gradient(max_value), 0.0)  # type: ignore
-    return r
+round_mode_registry: dict[str, Callable[..., Any]] = {}
+saturation_mode_registry: dict[str, Callable[..., Any]] = {}
 
 
 def rnd_mode(name: str):
     def inner(func):
         assert name not in round_mode_registry, f"Round mode '{name}' already exists."
-
-        @wraps(func)
-        def wrapper(x):
-            xq = func(x)
-            return ops.stop_gradient(xq) + (x - ops.stop_gradient(x))
-
-        round_mode_registry[name] = wrapper
-        return wrapper
+        round_mode_registry[name] = func
+        return func
 
     return inner
 
 
 @rnd_mode('TRN')
-def floor(x):
-    return ops.floor(x)
+def floor(x, bk: AbstractBackend | None = None):
+    bk = bk or get_backend(x)
+    return bk.floor(x)
 
 
 @rnd_mode('RND')
-def round(x):
+def round(x, bk: AbstractBackend | None = None):
     # Round to nearest, ties positive infinity.
-    return ops.floor(x + 0.5)
+    bk = bk or get_backend(x)
+    return bk.floor(x + 0.5)
 
 
 @rnd_mode('RND_CONV')
-def round_conv(x):
+def round_conv(x, bk: AbstractBackend | None = None):
     # Round to nearest, ties to even.
-    return ops.round(x)
+    bk = bk or get_backend(x)
+    return bk.round_conv(x)
 
 
 @rnd_mode('TRN_ZERO')
-def floor_zero(x):
+def floor_zero(x, bk: AbstractBackend | None = None):
     # Truncate towards zero.
-    sign = ops.sign(x)
-    return ops.floor(ops.abs(x)) * sign  # type: ignore
+    bk = bk or get_backend(x)
+    return bk.where(x < 0, -bk.floor(-x), bk.floor(x))
 
 
 @rnd_mode('RND_ZERO')
-def round_zero(x):
+def round_zero(x, bk: AbstractBackend | None = None):
     # Round to nearest, ties towards zero.
-    sign = ops.sign(x)
-    return -ops.floor(-ops.abs(x) + 0.5) * sign  # type:ignore
+    bk = bk or get_backend(x)
+    return bk.where(x < 0, bk.floor(x + 0.5), -bk.floor(-x + 0.5))
 
 
 @rnd_mode('RND_MIN_INF')
-def round_min_inf(x):
+def round_min_inf(x, bk: AbstractBackend | None = None):
     # Round to nearest, ties towards negative infinity.
-    return -ops.floor(-x + 0.5)  # type:ignore
+    bk = bk or get_backend(x)
+    return -bk.floor(-x + 0.5)
 
 
 @rnd_mode('RND_INF')
-def round_inf(x):
+def round_inf(x, bk: AbstractBackend | None = None):
     # Round to nearest, ties away from zero.
-    sign = ops.sign(x)
-    return ops.floor(ops.abs(x) + 0.5) * sign  # type: ignore
+    bk = bk or get_backend(x)
+    return bk.where(x < 0, -bk.floor(-x + 0.5), bk.floor(x + 0.5))
 
 
 def sat_mode(name: str | list | tuple):
@@ -91,62 +78,65 @@ def sat_mode(name: str | list | tuple):
 
 
 @sat_mode('WRAP')
-def wrap(x, k, i, f):
-    xs = x
-    bk = i + k
-    bias = k * 2.0 ** (bk - 1)
-    return ops.stop_gradient((xs + bias) % (2.0**bk) - bias) + (x - ops.stop_gradient(x))
+def wrap(x, k, i, f, bk: AbstractBackend | None = None):
+    bk = bk or get_backend(x)
+    b = i + k
+    bias = k * 2.0 ** (b - 1)
+    return bk.passthrough(x, (x + bias) % (2.0**b) - bias)
 
 
 @sat_mode('SAT')
-def sat(x, k, i, f):
+def sat(x, k, i, f, bk: AbstractBackend | None = None):
+    bk = bk or get_backend(x)
     f_eps = 2.0 ** (-f)
     __max = 2.0**i
     _max = __max - f_eps
     _min = -__max * k
-    r = _clip(x, _min, _max)
-    return r
+    return bk.clip(x, _min, _max)
 
 
 @sat_mode('SAT_SYM')
-def sat_sym(x, k, i, f):
+def sat_sym(x, k, i, f, bk: AbstractBackend | None = None):
+    bk = bk or get_backend(x)
     f_eps = 2.0 ** (-f)
     _max = 2.0**i - f_eps
     _min = -_max * k
-    r = _clip(x, _min, _max)
-    return r
+    return bk.clip(x, _min, _max)
 
 
 @sat_mode('WRAP_SM')
-def wrap_sm_fn(x, k, i, f, quant_fn: Callable = lambda x: x):
-    # x=ops.round(x*2.**f)
+def wrap_sm_fn(x, k, i, f, quant_fn: Callable = lambda x: x, bk: AbstractBackend | None = None):
     # High and low bounds are reflective. When overflows, can be less trash than WARP but still more trash than SAT.
+    bk = bk or get_backend(x)
+    i = bk.stop_gradient(i)
     eps = 2.0**-f
     high = 2.0**i - eps
     low = -(high + eps) * k
     interval = 2.0 ** (i + k)
     c1 = ((x) / interval) % 2 >= 1  # type: ignore
-    c1 = c1 & (ops.abs(x) > eps / 2)
+    c1 = c1 & (bk.abs(x) > eps / 2)
     c2 = ((x + eps / 2) / (interval / 2)) % 2 >= 1  # type: ignore
     qx = quant_fn(x)
     mapped = ((qx - high - eps) % interval) + low
 
-    mapped = ops.where(c2, -mapped - eps, mapped)  # type: ignore
-    mapped = ops.where(c1, -mapped - eps, mapped)  # type: ignore
+    mapped = bk.where(c2, -mapped - eps, mapped)  # type: ignore
+    mapped = bk.where(c1, -mapped - eps, mapped)  # type: ignore
 
     return mapped
 
 
 class FixedPointQuantizer:
-    def round(self, x, f: Any = 1.0):
+    def round(self, x, f: Any = 1.0, bk: AbstractBackend | None = None):
+        bk = bk or get_backend(x)
         scale = 2.0**f
         x = x * scale
-        xq = self.round_fn(x)
+        xq = self.round_fn(x, bk=bk)
         xq = xq / scale
         return xq
 
-    def saturate(self, x, k, i, f):
-        return self.sat_fn(x, k, i, f)
+    def saturate(self, x, k, i, f, bk: AbstractBackend | None = None):
+        bk = bk or get_backend(x)
+        return self.sat_fn(x, k, i, f, bk=bk)
 
     def __init__(self, round_mode: str = 'TRN', overflow_mode: str = 'WRAP'):
         round_mode = round_mode.upper()
@@ -165,31 +155,35 @@ class FixedPointQuantizer:
         self.sat_fn = sat_fn
         self.round_fn = round_fn
 
-    def forward(self, x, k, i, f):
+    def forward(self, x, k, i, f, bk: AbstractBackend | None = None):
         # Workaround for gradient computation around 0.
         # When have values outside boundary rounded to boundary, grad on f presents despite the value will be clipped off anyway.
         # Thus have saturation before rounding, except for wrap mode, which doesn't round during training.
-
+        bk = bk or get_backend(x)
         if self.overflow_mode != 'WRAP':
-            x = self.saturate(x, k, i, f)
-        x = self.round(x, f)
+            x = self.saturate(x, k, i, f, bk=bk)
+        x = self.round(x, f, bk=bk)
         if self.overflow_mode == 'WRAP':
-            x = self.saturate(x, k, i, f)
+            x = self.saturate(x, k, i, f, bk=bk)
         return x
 
-    def forward_wrap_sm(self, x, k, i, f):
-        def quant_fn(x):
-            return self.round(x, f)
+    def forward_wrap_sm(self, x, k, i, f, bk: AbstractBackend | None = None):
+        bk = bk or get_backend(x)
 
-        x = wrap_sm_fn(x, k, i, f, quant_fn)
+        def quant_fn(x):
+            return self.round(x, f, bk=bk)
+
+        x = wrap_sm_fn(x, k, i, f, quant_fn, bk=bk)
         return x
 
     def __call__(self, x, k, i, f):
-        i = ops.stop_gradient(ops.maximum(i, -f)) + (i - ops.stop_gradient(i))  # type: ignore
+        bk = get_backend(x)
+        k, i, f = (bk.asarray(v, like=x) for v in (k, i, f))
+        i = bk.passthrough(i, bk.where(i > -f, i, -f))  # i >= -f, gradient on i
         if self.overflow_mode != 'WRAP_SM':
-            return self.forward(x, k, i, f)
+            return self.forward(x, k, i, f, bk=bk)
         else:
-            return self.forward_wrap_sm(x, k, i, f)
+            return self.forward_wrap_sm(x, k, i, f, bk=bk)
 
 
 def fixed(x, k, i, f, round_mode: str = 'TRN', overflow_mode: str = 'WRAP'):
