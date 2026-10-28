@@ -462,7 +462,8 @@ class TinygradBackend(AbstractBackend):
         return x.tanh()
 
     def stop_gradient(self, x):
-        return x.detach()
+        # adding kernel boundary keeping values exact in wrap
+        return x.detach().contiguous()
 
 
 class KerasBackend(AbstractBackend):
