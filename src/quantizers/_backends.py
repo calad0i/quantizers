@@ -23,7 +23,7 @@ def get_backend(tensor) -> 'AbstractBackend':
 
     # Only the matching backend is created: creating others may not be traceable (e.g. by dynamo) or needed
     for backend_cls in _backend_classes:
-        if backend_cls.framework_name in sys.modules and backend_cls.is_appropriate_type(tensor):
+        if backend_cls.name in sys.modules and backend_cls.is_appropriate_type(tensor):
             backend = _type2backend[_type] = _load(backend_cls)
             return backend
 
@@ -31,7 +31,7 @@ def get_backend(tensor) -> 'AbstractBackend':
 
 
 def _load(backend_cls: type['AbstractBackend']) -> 'AbstractBackend':
-    name = backend_cls.framework_name
+    name = backend_cls.name
     backend = _loaded_backends.get(name)
     if backend is None:
         backend = _loaded_backends.setdefault(name, backend_cls())
@@ -42,49 +42,39 @@ class AbstractBackend:
     """Native ops used by the quantizers. Arguments other than the first may be python scalars, except for `where`.
     Keras Variables are only unwrapped when they are the dispatch key; elsewhere, pass `.value`."""
 
-    framework_name: str
+    name: str
     differentiable: bool = True
 
     @classmethod
     def is_appropriate_type(cls, tensor) -> bool:
-        """Only called with the framework imported, available as `sys.modules[cls.framework_name]`."""
-        raise NotImplementedError()
+        """Only called with the framework imported, available as `sys.modules[cls.name]`."""
+        ...
 
-    def asarray(self, x, like=None):
+    def asarray(self, x, like=None) -> Any:
         """`x` if it is native to the backend, else `x` converted to a native tensor with the dtype and device of `like`."""
         return x if self.is_appropriate_type(x) else self._asarray(x, like)
 
-    def _asarray(self, x, like):
-        raise NotImplementedError()
+    def _asarray(self, x, like): ...
 
-    def _floor(self, x):
-        raise NotImplementedError()
+    def _floor(self, x): ...
 
     def _round_conv(self, x):
         """Round to nearest, ties to even."""
-        raise NotImplementedError()
+        ...
 
-    def _clip(self, x, min_value, max_value):
-        raise NotImplementedError()
+    def _clip(self, x, min_value, max_value): ...
 
-    def sign(self, x):
-        raise NotImplementedError()
-
-    def abs(self, x):
-        raise NotImplementedError()
+    def abs(self, x): ...
 
     def where(self, cond, x, y):
         """`cond` must be a native tensor; `x` and `y` may be python scalars."""
-        raise NotImplementedError()
+        ...
 
-    def log2(self, x):
-        raise NotImplementedError()
+    def log2(self, x): ...
 
-    def tanh(self, x):
-        raise NotImplementedError()
+    def tanh(self, x): ...
 
-    def stop_gradient(self, x):
-        raise NotImplementedError()
+    def stop_gradient(self, x): ...
 
     def surrogate(self, value, *grads):
         """`value`, with gradient `c` w.r.t. `x` for each `(x, c)` in `grads`; `c=None` passes the gradient through.
@@ -143,9 +133,6 @@ class _NumpyLikeBackend(AbstractBackend):
     def _clip(self, x, min_value, max_value):
         return self.np.clip(x, min_value, max_value)
 
-    def sign(self, x):
-        return self.np.sign(x)
-
     def abs(self, x):
         return self.np.abs(x)
 
@@ -162,7 +149,7 @@ class _NumpyLikeBackend(AbstractBackend):
 class NumpyBackend(_NumpyLikeBackend):
     """No gradient support, so the gradient routing is skipped."""
 
-    framework_name = 'numpy'
+    name = 'numpy'
     differentiable = False
 
     def __init__(self):
@@ -186,7 +173,7 @@ class NumpyBackend(_NumpyLikeBackend):
 
 
 class JaxBackend(_NumpyLikeBackend):
-    framework_name = 'jax'
+    name = 'jax'
 
     def __init__(self):
         import jax
@@ -225,7 +212,7 @@ class JaxBackend(_NumpyLikeBackend):
 
 
 class TorchBackend(AbstractBackend):
-    framework_name = 'torch'
+    name = 'torch'
 
     def __init__(self):
         import torch
@@ -240,9 +227,7 @@ class TorchBackend(AbstractBackend):
         return isinstance(tensor, sys.modules['torch'].Tensor)
 
     def _asarray(self, x, like):
-        if like is None:
-            return self.torch.as_tensor(x)
-        return self.torch.as_tensor(x, dtype=like.dtype, device=like.device)
+        return self.torch.as_tensor(x, dtype=getattr(like, 'dtype', None), device=getattr(like, 'device', None))
 
     def _floor(self, x):
         return self.torch.floor(x)
@@ -253,9 +238,6 @@ class TorchBackend(AbstractBackend):
     def _clip(self, x, min_value, max_value):
         # torch.clamp does not take a tensor and a python scalar bound at once
         return self.torch.minimum(self.torch.maximum(x, self.asarray(min_value, x)), self.asarray(max_value, x))
-
-    def sign(self, x):
-        return self.torch.sign(x)
 
     def abs(self, x):
         return self.torch.abs(x)
@@ -282,7 +264,7 @@ class TorchBackend(AbstractBackend):
 class TensorflowBackend(AbstractBackend):
     """Covers tf.Tensor, tf.Variable, and symbolic tensors inside tf.function."""
 
-    framework_name = 'tensorflow'
+    name = 'tensorflow'
 
     def __init__(self):
         import tensorflow
@@ -321,9 +303,6 @@ class TensorflowBackend(AbstractBackend):
     def _clip(self, x, min_value, max_value):
         return self.tf.minimum(self.tf.maximum(*self._pair(x, min_value)), self._pair(x, max_value)[1])
 
-    def sign(self, x):
-        return self.tf.sign(x)
-
     def abs(self, x):
         return self.tf.abs(x)
 
@@ -356,7 +335,7 @@ class TensorflowBackend(AbstractBackend):
 
 class MLXBackend(AbstractBackend):
     # Check for mlx.core, as other mlx.<submodules> don't need it
-    framework_name = 'mlx.core'
+    name = 'mlx.core'
 
     def __init__(self):
         import mlx.core as mx
@@ -396,9 +375,6 @@ class MLXBackend(AbstractBackend):
     def _clip(self, x, min_value, max_value):
         return self.mx.minimum(self.mx.maximum(x, min_value), max_value)
 
-    def sign(self, x):
-        return self.mx.sign(x)
-
     def abs(self, x):
         return self.mx.abs(x)
 
@@ -421,7 +397,7 @@ class MLXBackend(AbstractBackend):
 class TinygradBackend(AbstractBackend):
     """No custom gradients in tinygrad: `surrogate` uses the stop_gradient fallback."""
 
-    framework_name = 'tinygrad'
+    name = 'tinygrad'
 
     def __init__(self):
         from tinygrad import Tensor
@@ -446,9 +422,6 @@ class TinygradBackend(AbstractBackend):
     def _clip(self, x, min_value, max_value):
         return x.maximum(min_value).minimum(max_value)
 
-    def sign(self, x):
-        return x.sign()
-
     def abs(self, x):
         return x.abs()
 
@@ -469,7 +442,7 @@ class TinygradBackend(AbstractBackend):
 class KerasBackend(AbstractBackend):
     """Thin shim for keras 3 Variables: unwraps them to `.value` and delegates to the backend keras runs on."""
 
-    framework_name = 'keras'
+    name = 'keras'
 
     def __init__(self):
         import keras
@@ -477,9 +450,8 @@ class KerasBackend(AbstractBackend):
         self.keras = keras
 
         self.Variable = keras.Variable
-        native_cls = {cls.framework_name: cls for cls in (JaxBackend, TorchBackend, TensorflowBackend, NumpyBackend)}
-        if keras.backend.backend() not in native_cls:
-            raise TypeError(f'Keras backend {keras.backend.backend()} is not supported')
+        native_cls = {cls.name: cls for cls in (JaxBackend, TorchBackend, TensorflowBackend, NumpyBackend)}
+        assert keras.backend.backend() in native_cls, f'Keras backend {keras.backend.backend()} is not supported'
         self.native = _load(native_cls[keras.backend.backend()])
 
     @classmethod
@@ -488,9 +460,7 @@ class KerasBackend(AbstractBackend):
         return isinstance(tensor, getattr(sys.modules['keras'], 'Variable', ()))
 
     def _unwrap(self, x):
-        if isinstance(x, tuple):  # (x, c) pairs of surrogate
-            return tuple(self._unwrap(v) for v in x)
-        return x.value if isinstance(x, self.Variable) else x
+        return tuple(self._unwrap(v) for v in x) if isinstance(x, tuple) else (x.value if isinstance(x, self.Variable) else x)
 
     @property
     def differentiable(self):  # type: ignore
