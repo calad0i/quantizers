@@ -39,17 +39,16 @@ Limitations:
 Parameters:
 - `m` (mantissa_bits): Mantissa width
 - `e` (exponent_bits): Exponent width
-- `e0` (exponent_zero): Exponent bias (default: 0)
+- `e0` (exponent_zero): Exponent bias
 - Range: `[-2^(e-1) + e0, 2^(e-1) - 1 + e0]`
 
 Features:
 - Supports subnormal numbers
 - Uses `RND_CONV` rounding and `SAT` overflow
-- HLS-synthesizable implementation in `test/cpp_source/ap_types/ap_float.h`
 
 ### Simplified Quantizers
 
-- **Binary**: Maps to {-1,1} with 0 to -1. (preliminary implementation)
+- **Binary**: Maps to {-1,1} with 0 to 1. (preliminary implementation)
 - **Ternary**: Shorthand for fixed-point `fixed<2, 1, RND_CONV, SAT_SYM>`
 
 
