@@ -4,7 +4,7 @@ from typing import Any
 from .._backends import get_backend
 
 
-def float_quantize(x, m, e, e0: Any = 0.0):
+def float_quantize(x, m, e, e0: Any = 1.0):
     """Quantize an array to floatlet (m mantissa bits, excl. sign bit, e exponent bits) format. Tentative gradient impl."""
     bk = get_backend(x)
     m, e, e0 = (bk.asarray(v, like=x) for v in (m, e, e0))
@@ -38,7 +38,7 @@ def float_quantize(x, m, e, e0: Any = 0.0):
     return bk.surrogate(qx, (x, None), (m, dm), (e, de), (e0, de0))
 
 
-def float_decompose(x, m, e, e0: Any = 0.0):
+def float_decompose(x, m, e, e0: Any = 1.0):
     """Decompose an array into (mantissa, exponent) of floatlet (m mantissa bits, excl. sign bit, e exponent bits) format."""
     bk = get_backend(x)
     m, e, e0 = (bk.asarray(v, like=x) for v in (m, e, e0))

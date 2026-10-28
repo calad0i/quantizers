@@ -1,35 +1,27 @@
-#include "ap_types/ap_binary.h"
-#include "ap_types/ap_float.h"
-#include <vector>
-namespace qkn_test {
-template <int M, int E, int E0> std::vector<ap_float<M, E, E0>> floatq(std::vector<float> vx) {
-    std::vector<ap_float<M, E, E0>> res(vx.size());
-    for (int i = 0; i < vx.size(); i++) {
-        ap_float<M, E, E0> a(vx[i]);
-        res[i] = a.to_float();
-    }
-    return res;
+#pragma once
+#include "ac_types/ac_fixed.h"
+#include "ac_types/ac_std_float.h"
+#include <cmath>
+#include <cstddef>
+
+namespace qtest {
+template <typename T> void quantize(const float *in, float *out, size_t n) {
+    for (size_t i = 0; i < n; ++i)
+        out[i] = T(in[i]).to_double();
 }
 
-template <int _AP_W, int _AP_I, bool _AP_S, ap_q_mode _AP_Q, ap_o_mode _AP_O>
-std::vector<ap_fixed_base<_AP_W, _AP_I, _AP_S, _AP_Q, _AP_O, 0>> fixedq(std::vector<float> vx) {
-    std::vector<ap_fixed_base<_AP_W, _AP_I, _AP_S, _AP_Q, _AP_O, 0>> res(vx.size());
-    for (int i = 0; i < vx.size(); i++) {
-        ap_fixed_base<_AP_W, _AP_I, _AP_S, _AP_Q, _AP_O, 0> a(vx[i]);
-        res[i] = a;
+// no inf/nan, matching behavior using one extra exponent with explicit clamping
+template <int M, int E, int E0> void minifloat(const float *in, float *out, size_t n) {
+    constexpr int e_high = (1 << (E - 1)) - 1 + E0;
+    const float max = std::ldexp(2.0f - std::ldexp(1.0f, -M), e_high);
+    for (size_t i = 0; i < n; ++i) {
+        float q = std::ldexp(ac_std_float<2 + E + M, E + 1>(std::ldexp(in[i], -e_high)).to_float(), e_high);
+        out[i] = std::fmin(std::fmax(q, -max), max);
     }
-    return res;
 }
 
-std::vector<ap_binary> binaryq(std::vector<float> vx) {
-    std::vector<ap_binary> res(vx.size());
-    for (int i = 0; i < vx.size(); i++) {
-        ap_binary a(vx[i]);
-        res[i] = a;
-    }
-    return res;
+inline void binary(const float *in, float *out, size_t n) {
+    for (size_t i = 0; i < n; ++i)
+        out[i] = in[i] >= 0 ? 1.0f : -1.0f;
 }
-
-auto ternaryq(std::vector<float> vx) { return fixedq<2, 2, true, AP_RND_CONV, AP_SAT_SYM>(vx); }
-
-} // namespace qkn_test
+} // namespace qtest
