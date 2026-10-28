@@ -191,7 +191,7 @@ class JaxBackend(_NumpyLikeBackend):
             value, xs, cs = primals
             out = jnp.zeros_like(value)
             for t, c in zip(tangents[1], cs):
-                if isinstance(t, SymbolicZero) or t.dtype == jax.dtypes.float0:
+                if isinstance(t, SymbolicZero):
                     continue
                 out = out + (t if c is None else t * c)
             return value, jnp.broadcast_to(out, value.shape).astype(value.dtype)
@@ -282,8 +282,7 @@ class TensorflowBackend(AbstractBackend):
 
     def _unbroadcast(self, g, x):
         tf = self.tf
-        if not x.dtype.is_floating:
-            return None
+        assert x.dtype.is_floating, f'Gradient of {type(x)} is not floating: {x.dtype}'
         axes, _ = tf.raw_ops.BroadcastGradientArgs(s0=tf.shape(x), s1=tf.shape(g))
         return tf.cast(tf.reshape(tf.reduce_sum(g, axis=axes), tf.shape(x)), x.dtype)
 
@@ -409,9 +408,7 @@ class TinygradBackend(AbstractBackend):
         return isinstance(tensor, sys.modules['tinygrad'].Tensor)
 
     def _asarray(self, x, like):
-        if like is None:
-            return self.Tensor(x)
-        return self.Tensor(x, dtype=like.dtype, device=like.device)
+        return self.Tensor(x, dtype=getattr(like, 'dtype', None), device=getattr(like, 'device', None))
 
     def _floor(self, x):
         return x.floor()

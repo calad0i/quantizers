@@ -32,6 +32,28 @@ def test_dispatch_jax_jit():
     np.testing.assert_array_equal(fn(X), np.floor(X))
 
 
+def test_jax_partial_grad():
+    """jax grad with only some of the parameters differentiable"""
+    jax = pytest.importorskip('jax')
+    from quantizers import FixedPointQuantizer, float_quantize
+
+    w = np.arange(1, len(X) + 1, dtype=np.float32)
+    cases = [
+        (FixedPointQuantizer('RND', 'SAT'), (1.0, 1.0, 1.0)),
+        (float_quantize, (0.0, 2.0, -1.0)),
+    ]
+    for q, params in cases:
+
+        def loss(*args, q=q):
+            return jax.numpy.sum(q(*args) * w)
+
+        args = [jax.numpy.asarray(X)] + [jax.numpy.full(len(X), p) for p in params]
+        joint = jax.grad(loss, argnums=range(len(args)))(*args)
+        assert all(np.any(g) for g in joint[1:])
+        for j, g in enumerate(joint):
+            np.testing.assert_array_equal(jax.grad(loss, argnums=j)(*args), g)
+
+
 def test_unknown_type():
     with pytest.raises(TypeError):
         get_backend(object())
@@ -57,9 +79,10 @@ def test_scalar_args(fw: FWDict):
             bk.clip(x, -0.5, 1.5),
             bk.floor(x),
             bk.round_conv(x),
+            bk.stop_gradient(x),
         )
 
-    refs = [np.where(X > 0, X, 0), np.where(X > 0, 0, X), np.clip(X, -0.5, 1.5), np.floor(X), np.round(X)]
+    refs = [np.where(X > 0, X, 0), np.where(X > 0, 0, X), np.clip(X, -0.5, 1.5), np.floor(X), np.round(X), X]
     for wrap in (lambda fn: fn, fw.get('jit')):
         if wrap is None:
             continue
