@@ -3,7 +3,7 @@ from typing import Any, TypeVar, overload
 import numpy as np
 
 from .binary import binary_quantize, ternary_quantize
-from .fixed_point import FixedPointQuantizer
+from .fixed_point import fixed_quantize
 from .minifloat import float_quantize
 
 T = TypeVar('T', np.ndarray, float, int)
@@ -73,7 +73,7 @@ class FixedQ:
 
     def __call__(self, x):
         k, i, f = self.signed, self.integer - self.signed, self.width - self.integer
-        return FixedPointQuantizer(self.rounding, self.overflow)(x, k, i, f)
+        return fixed_quantize(x, k, i, f, self.rounding, self.overflow)
 
     def __repr__(self):
         return f'Fixed(w={self.width}, i={self.integer}, s={self.signed}, r={self.rounding}, o={self.overflow})'

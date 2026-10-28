@@ -146,5 +146,5 @@ class FixedPointQuantizer:
         return self.forward(x, k, i, f, bk=bk)
 
 
-def fixed(x, k, i, f, round_mode: str = 'TRN', overflow_mode: str = 'WRAP'):
+def fixed_quantize(x, k, i, f, round_mode: str = 'TRN', overflow_mode: str = 'WRAP'):
     return FixedPointQuantizer(round_mode, overflow_mode)(x, k, i, f)
