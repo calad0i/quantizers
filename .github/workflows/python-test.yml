@@ -9,24 +9,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v7
         with:
-          python-version: 3.x
+          python-version: '3.13'
+          cache-dependency-path: pyproject.toml
 
       - name: Install dependencies
         run: |
-          cd $GITHUB_WORKSPACE
+          pip install torch --index-url https://download.pytorch.org/whl/cpu # CPU-only: skips the CUDA wheels
           pip install -e '.[test]'
 
       - name: Run tests
-        run: pytest --import-mode=importlib -n4 --cov --cov-report=xml --cov=src/quantizers
+        run: pytest -n4
 
       - name: Upload results to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
