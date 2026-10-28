@@ -104,27 +104,6 @@ def sat_sym(x, k, i, f, bk: AbstractBackend | None = None):
     return bk.clip(x, _min, _max)
 
 
-@sat_mode('WRAP_SM')
-def wrap_sm_fn(x, k, i, f, quant_fn: Callable = lambda x: x, bk: AbstractBackend | None = None):
-    # High and low bounds are reflective. When overflows, can be less trash than WARP but still more trash than SAT.
-    bk = bk or get_backend(x)
-    i = bk.stop_gradient(i)
-    eps = 2.0**-f
-    high = 2.0**i - eps
-    low = -(high + eps) * k
-    interval = 2.0 ** (i + k)
-    c1 = ((x) / interval) % 2 >= 1  # type: ignore
-    c1 = c1 & (bk.abs(x) > eps / 2)
-    c2 = ((x + eps / 2) / (interval / 2)) % 2 >= 1  # type: ignore
-    qx = quant_fn(x)
-    mapped = ((qx - high - eps) % interval) + low
-
-    mapped = bk.where(c2, -mapped - eps, mapped)  # type: ignore
-    mapped = bk.where(c1, -mapped - eps, mapped)  # type: ignore
-
-    return mapped
-
-
 class FixedPointQuantizer:
     def round(self, x, f: Any = 1.0, bk: AbstractBackend | None = None):
         bk = bk or get_backend(x)
@@ -141,13 +120,6 @@ class FixedPointQuantizer:
     def __init__(self, round_mode: str = 'TRN', overflow_mode: str = 'WRAP'):
         round_mode = round_mode.upper()
         overflow_mode = overflow_mode.upper()
-
-        if overflow_mode == 'WRAP_SM':
-            assert round_mode in (
-                'RND',
-                'RND_CONV',
-            ), 'WRAP_SM only supports RND and RND_CONV rounding modes in this implementation.'
-
         self.round_mode = round_mode
         self.overflow_mode = overflow_mode
         round_fn = round_mode_registry[round_mode]
@@ -167,23 +139,11 @@ class FixedPointQuantizer:
             x = self.saturate(x, k, i, f, bk=bk)
         return x
 
-    def forward_wrap_sm(self, x, k, i, f, bk: AbstractBackend | None = None):
-        bk = bk or get_backend(x)
-
-        def quant_fn(x):
-            return self.round(x, f, bk=bk)
-
-        x = wrap_sm_fn(x, k, i, f, quant_fn, bk=bk)
-        return x
-
     def __call__(self, x, k, i, f):
         bk = get_backend(x)
         k, i, f = (bk.asarray(v, like=x) for v in (k, i, f))
         i = bk.passthrough(i, bk.where(i > -f, i, -f))  # i >= -f, gradient on i
-        if self.overflow_mode != 'WRAP_SM':
-            return self.forward(x, k, i, f, bk=bk)
-        else:
-            return self.forward_wrap_sm(x, k, i, f, bk=bk)
+        return self.forward(x, k, i, f, bk=bk)
 
 
 def fixed(x, k, i, f, round_mode: str = 'TRN', overflow_mode: str = 'WRAP'):

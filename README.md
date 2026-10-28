@@ -27,12 +27,11 @@ Parameters:
 
 Supported modes:
 - Rounding: `TRN`, `RND`, `RND_CONV`, `TRN_ZERO`, `RND_ZERO`, `RND_MIN_INF`, `RND_INF`
-- Overflow: `WRAP`, `SAT`, `SAT_SYM`, `WRAP_SM`
+- Overflow: `WRAP`, `SAT`, `SAT_SYM`
 
 Limitations:
-- `WRAP_SM` only works with `RND` or `RND_CONV` rounding
 - `WRAP*` modes don't provide surrogate gradients for integer bits
-- Saturation bit forced to zero for `WRAP` and `WRAP_SM`
+- Saturation bit forced to zero for `WRAP`
 
 ### Minifloat Quantizer
 
