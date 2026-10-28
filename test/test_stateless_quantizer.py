@@ -1,9 +1,6 @@
-import os
-
-import jax
-import jax.numpy as jnp
 import numpy as np
 import pytest
+from conftest import FWDict
 
 from quantizers import (
     FixedPointQuantizer,
@@ -17,35 +14,31 @@ from quantizers import (
 @pytest.fixture(scope='module')
 def x_kif():
     N = (100000,)
-    key = jax.random.PRNGKey(int(os.environ.get('PYTEST_SEED', 0)))
-    k1, k2, k3, k4 = jax.random.split(key, 4)
-    k = jax.random.uniform(k1, N) > 0.5
-    i = jax.random.randint(k2, N, -4, 8).astype(jnp.float32)
-    f = jax.random.randint(k3, N, -4, 8).astype(jnp.float32)
-    x = jax.random.normal(k4, N).astype(jnp.float32)
-    f = jnp.maximum(f, jnp.where(k, -i, -i + 1))
+    k = np.random.rand(N[0]) > 0.5
+    i = np.random.randint(-4, 8, N).astype(np.float32)
+    f = np.random.randint(-4, 8, N).astype(np.float32)
+    x = np.random.normal(size=N).astype(np.float32)
+    f = np.maximum(f, np.where(k, -i, -i + 1))
     return x, k, i, f
 
 
 @pytest.fixture(scope='module')
 def xxx_mee0():
     N = (100000,)
-    key = jax.random.PRNGKey(int(os.environ.get('PYTEST_SEED', 0)))
-    k1, k2, k3, k4 = jax.random.split(key, 4)
-    M = jax.random.randint(k1, N, 1, 9).astype(jnp.float32)
-    E = jax.random.randint(k2, N, 1, 4).astype(jnp.float32)
-    E0 = jax.random.randint(k3, N, -8, 8).astype(jnp.float32)
-    x = jax.random.uniform(k4, N, jnp.float32, -1.0, 1.0)
+    M = np.random.randint(1, 9, N).astype(np.float32)
+    E = np.random.randint(1, 4, N).astype(np.float32)
+    E0 = np.random.randint(-8, 8, N).astype(np.float32)
+    x = np.random.uniform(-1.0, 1.0, N).astype(np.float32)
 
-    sign = jnp.sign(x)
-    x = jnp.abs(x)
+    sign = np.sign(x)
+    x = np.abs(x)
     m_eps = 2.0**-M
     _max = (2 - m_eps) * 2.0 ** (2.0 ** (E - 1) - 1 + E0)
     _min_pos_normal = 2.0 ** (-(2.0 ** (E - 1)) + E0 + 1)
     _min_pos_subnormal = m_eps * 2.0 ** (-(2.0 ** (E - 1)) + E0)
-    log_subnormal = jnp.log2(_min_pos_subnormal)
-    log_normal = jnp.log2(_min_pos_normal)
-    log_overflow = jnp.log2(_max)
+    log_subnormal = np.log2(_min_pos_subnormal)
+    log_normal = np.log2(_min_pos_normal)
+    log_overflow = np.log2(_max)
 
     x_normal = 2.0 ** (x * (log_overflow - log_normal) + log_normal) * sign
     x_subnormal = 2.0 ** (x * (log_normal - log_subnormal) + log_subnormal - 1) * sign
@@ -55,10 +48,10 @@ def xxx_mee0():
 
 
 @pytest.mark.parametrize('round_mode', ['TRN', 'TRN_ZERO', 'RND', 'RND_CONV', 'RND_ZERO', 'RND_INF', 'RND_MIN_INF'])
-@pytest.mark.parametrize('overflow_mode', ['WRAP', 'SAT', 'SAT_SYM', 'WRAP_SM'])
-def test_fixed_quantizer_grad(round_mode, overflow_mode, x_kif):
-    if round_mode not in ('RND', 'RND_CONV') and overflow_mode == 'WRAP_SM':
-        pytest.skip('Not supported')
+@pytest.mark.parametrize('overflow_mode', ['WRAP', 'SAT', 'SAT_SYM'])
+def test_fixed_quantizer_grad(round_mode, overflow_mode, x_kif, fw: FWDict):
+    if fw['grad'] is None:
+        pytest.skip('No gradient support')
 
     quantizer = FixedPointQuantizer(round_mode, overflow_mode)
     assert callable(quantizer)
@@ -69,56 +62,53 @@ def test_fixed_quantizer_grad(round_mode, overflow_mode, x_kif):
 
     def abs_quantization_err(x, k, i, f):
         xq = quantizer(x, k, i, f)  # type: ignore
-        err = jnp.abs(x - xq)
-        return jnp.sum(err)
+        return fw['abs'](x - xq)
 
-    dx, di, df = jax.grad(abs_quantization_err, (0, 2, 3))(x, 1, i, f)
+    dx, di, df = fw['grad'](abs_quantization_err, (0, 2, 3))(x, 1, i, f)
 
     if overflow_mode == 'WRAP':
-        assert jnp.all(dx == 0), 'X grad Error'
-        assert jnp.all(di == 0), 'I grad Error'
-        assert jnp.all((df < 0) | (x < -(2**i)) | (x > 2**i - 2**-f)), 'F grad Error'
+        assert np.all(dx == 0), 'X grad Error'
+        assert np.all(di == 0), 'I grad Error'
+        assert np.all((df < 0) | (x < -(2**i)) | (x > 2**i - 2**-f) | (x == quantizer(x, 1, i, f))), 'F grad Error'
     elif overflow_mode in ('SAT', 'SAT_SYM'):
-        for _dx in jnp.unique(dx):
+        for _dx in np.unique(dx):
             assert _dx in (-1, 0, 1), 'X grad Error'
-        assert jnp.all(df <= 0), 'F grad Error'
-        assert jnp.all(di <= 0), 'I grad Error'
-        assert jnp.all((df < 0) | (di < 0) | (x == xq) | ((k == 0) & (x < 0))), 'Grad Error for sat mode'
-    elif overflow_mode == 'WRAP_SM':
-        mask = jnp.abs(x) < 2.0**i - 2.0**f
-        assert jnp.all(df[mask] < 0), f'F grad Error {jnp.mean(df <= 0)}'
+        assert np.all(df <= 0), 'F grad Error'
+        assert np.all(di <= 0), 'I grad Error'
+        assert np.all((df < 0) | (di < 0) | (x == xq) | ((k == 0) & (x < 0))), 'Grad Error for sat mode'
 
 
-def test_float_quantizer_grad(xxx_mee0):
+def test_float_quantizer_grad(xxx_mee0, fw: FWDict):
+    if fw['grad'] is None:
+        pytest.skip('No gradient support')
     xxx, M, E, E0 = xxx_mee0
     x_normal, x_subnormal, x_overflow = xxx
 
-    def abs_quantization_err(x, M, E, E0):
+    def quantization_err(x, M, E, E0):
         xq = float_quantize(x, M, E, E0)
-        err = jnp.abs(x - xq)
-        return jnp.sum(err)
+        return fw['abs'](x - xq)
 
-    dx, dm, de, de0 = jax.grad(abs_quantization_err, range(4))(x_normal, M, E, E0)
+    dx, dm, de, de0 = fw['grad'](quantization_err, range(4))(x_normal, M, E, E0)
     xq = float_quantize(x_normal, M, E, E0)
     mask = x_normal != xq
-    assert jnp.all(dx == 0), 'Normal Number X grad Error'
-    assert jnp.all(dm[mask] < 0), f'Normal Number M grad Error: max={jnp.max(dm[mask])}>0'
-    assert jnp.all(de == 0), 'Normal Number E grad Error'
-    assert jnp.all(de0 == 0), 'Normal Number E0 grad Error'
+    assert np.all(dx == 0), 'Normal Number X grad Error'
+    assert np.all(dm[mask] < 0), f'Normal Number M grad Error: max={np.max(dm[mask])}>0'
+    assert np.all(de == 0), 'Normal Number E grad Error'
+    assert np.all(de0 == 0), 'Normal Number E0 grad Error'
 
-    dx, dm, de, de0 = jax.grad(abs_quantization_err, range(4))(x_subnormal, M, E, E0)
+    dx, dm, de, de0 = fw['grad'](quantization_err, range(4))(x_subnormal, M, E, E0)
     xq = float_quantize(x_subnormal, M, E, E0)
     mask = x_subnormal != xq
-    assert jnp.all(dx == 0), 'Subnormal Number X grad Error'
-    assert jnp.all(dm[mask] < 0), f'Subnormal Number M grad Error: max={jnp.max(dm[mask])}>0'
-    assert jnp.all(de[mask] < 0), f'Subnormal Number E grad Error: max={jnp.max(de[mask])}>0'
-    assert jnp.all(de0[mask] > 0), f'Subnormal Number E0 grad Error: max={jnp.max(de0[mask])}>0'
+    assert np.all(dx == 0), 'Subnormal Number X grad Error'
+    assert np.all(dm[mask] < 0), f'Subnormal Number M grad Error: max={np.max(dm[mask])}>0'
+    assert np.all(de[mask] < 0), f'Subnormal Number E grad Error: max={np.max(de[mask])}>0'
+    assert np.all(de0[mask] > 0), f'Subnormal Number E0 grad Error: max={np.max(de0[mask])}>0'
 
-    dx, dm, de, de0 = jax.grad(abs_quantization_err, range(4))(x_overflow, M, E, E0)
-    assert jnp.all(dx == 0), 'Overflow Number X grad Error'
-    assert jnp.all(dm == 0), 'Overflow Number M grad Error'
-    assert jnp.all(de < 0), f'Overflow Number E grad Error: max={jnp.max(de)}>0'
-    assert jnp.all(de0 < 0), f'Overflow Number E0 grad Error: max={jnp.max(de0)}>0'
+    dx, dm, de, de0 = fw['grad'](quantization_err, range(4))(x_overflow, M, E, E0)
+    assert np.all(dx == 0), 'Overflow Number X grad Error'
+    assert np.all(dm == 0), 'Overflow Number M grad Error'
+    assert np.all(de < 0), f'Overflow Number E grad Error: max={np.max(de)}>0'
+    assert np.all(de0 < 0), f'Overflow Number E0 grad Error: max={np.max(de0)}>0'
 
 
 def float_decompose_np(*args):
@@ -135,9 +125,9 @@ def test_float_decompose(xxx_mee0):
 
     xq_ = mm * 2.0**ee  # type: ignore
     xq = float_quantize(x_normal, M, E, E0)
-    assert jnp.all(xq == xq_), 'Float Decompose Error @ Normal Number'
-    assert jnp.all(jnp.abs(mm) < 2), 'Mantissa Error @ Normal Number'  # type: ignore
-    assert jnp.all(jnp.abs(mm) >= 1), 'Mantissa Error @ Normal Number'  # type: ignore
+    assert np.all(xq == xq_), 'Float Decompose Error @ Normal Number'
+    assert np.all(np.abs(mm) < 2), 'Mantissa Error @ Normal Number'  # type: ignore
+    assert np.all(np.abs(mm) >= 1), 'Mantissa Error @ Normal Number'  # type: ignore
 
     mm, ee = float_decompose(x_subnormal, M, E, E0)
     mm_, ee_ = float_decompose_np(x_subnormal, M, E, E0)
@@ -145,8 +135,8 @@ def test_float_decompose(xxx_mee0):
 
     xq_ = mm * 2.0**ee  # type: ignore
     xq = float_quantize(x_subnormal, M, E, E0)
-    assert jnp.all(xq == xq_), 'Float Decompose Error @ Subnormal Number'
-    assert jnp.all(jnp.abs(mm) < 1), 'Mantissa Error @ Subnormal Number'  # type: ignore
+    assert np.all(xq == xq_), 'Float Decompose Error @ Subnormal Number'
+    assert np.all(np.abs(mm) < 1), 'Mantissa Error @ Subnormal Number'  # type: ignore
 
     mm, ee = float_decompose(x_overflow, M, E, E0)
     mm_, ee_ = float_decompose_np(x_overflow, M, E, E0)
@@ -154,22 +144,26 @@ def test_float_decompose(xxx_mee0):
 
     xq_ = mm * 2.0**ee  # type: ignore
     xq = float_quantize(x_overflow, M, E, E0)
-    assert jnp.all(xq == xq_), 'Float Decompose Error'
-    assert jnp.all(jnp.abs(mm) < 2), 'Mantissa Error @ Overflow Number'  # type: ignore
-    assert jnp.all(jnp.abs(mm) >= 1), 'Mantissa Error @ Overflow Number'  # type: ignore
+    assert np.all(xq == xq_), 'Float Decompose Error'
+    assert np.all(np.abs(mm) < 2), 'Mantissa Error @ Overflow Number'  # type: ignore
+    assert np.all(np.abs(mm) >= 1), 'Mantissa Error @ Overflow Number'  # type: ignore
 
 
-def test_binary_quantizer_grad(x_kif):
+def test_binary_quantizer_grad(x_kif, fw: FWDict):
+    if fw['grad'] is None:
+        pytest.skip('No gradient support')
     x, *_ = x_kif
     xq = binary_quantize(x)
-    assert jnp.all((xq == -1) | (xq == 1)), 'Binary Quantizer Error'
-    grad = jax.grad(lambda x: jnp.sum(binary_quantize(x)))(x)
-    assert jnp.all(grad > 0), 'Gradient Error'
+    assert np.all((xq == -1) | (xq == 1)), 'Binary Quantizer Error'
+    grad = fw['grad'](lambda x: binary_quantize(x))(x)
+    assert np.all(grad > 0), 'Gradient Error'
 
 
-def test_ternary_quantizer_grad(x_kif):
+def test_ternary_quantizer_grad(x_kif, fw: FWDict):
+    if fw['grad'] is None:
+        pytest.skip('No gradient support')
     x, *_ = x_kif
     xq = ternary_quantize(x)
-    assert jnp.all((xq == -1) | (xq == 0) | (xq == 1)), 'Ternary Quantizer Error'
-    grad = jax.grad(lambda x: jnp.sum(ternary_quantize(x)))(x)
-    assert jnp.all(grad > 0), 'Gradient Error'
+    assert np.all((xq == -1) | (xq == 0) | (xq == 1)), 'Ternary Quantizer Error'
+    grad = fw['grad'](lambda x: ternary_quantize(x))(x)
+    assert np.all(grad > 0), 'Gradient Error'

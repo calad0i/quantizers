@@ -2,6 +2,7 @@ import ctypes
 
 import numpy as np
 import pytest
+from conftest import FWDict
 from gen_configs import LIB_PATH, MATCH_CONFIGS_FIXED, MATCH_CONFIGS_FLOAT, fixed_symbol, float_symbol
 from numpy.ctypeslib import ndpointer
 
@@ -29,12 +30,12 @@ def c_quantize(lib, symbol: str, x: np.ndarray, dtype: type = np.float32) -> np.
 
 
 @pytest.mark.parametrize('config', MATCH_CONFIGS_FIXED, ids=lambda c: fixed_symbol(*c))
-def test_fixed_quantizer_forward(config, data, lib):
+def test_fixed_quantizer_forward(config, data, lib, fw: FWDict):
     S, W, I, RND, SAT = config
     fixed_q = FixedQ(W, I, S, RND, SAT)
     print(fixed_q)
 
-    arr_py_fixed = np.asarray(fixed_q(data))
+    arr_py_fixed = np.asarray(fixed_q(fw['make'](data)))
     arr_c_fixed = c_quantize(lib, fixed_symbol(*config), data)
 
     mismatch = np.where(arr_py_fixed != arr_c_fixed)[0]
@@ -47,11 +48,11 @@ def test_fixed_quantizer_forward(config, data, lib):
 
 
 @pytest.mark.parametrize('config', MATCH_CONFIGS_FLOAT, ids=lambda c: float_symbol(*c))
-def test_minifloat_quantizer_forward(config, data, lib):
+def test_minifloat_quantizer_forward(config, data, lib, fw: FWDict):
     q = MinifloatQ(*config)
     print(q)
 
-    arr_py_float = np.asarray(q(data))
+    arr_py_float = np.asarray(q(fw['make'](data)))
     arr_c_float = c_quantize(lib, float_symbol(*config), data)
 
     mismatch = np.where(arr_py_float != arr_c_float)[0]
@@ -63,11 +64,11 @@ def test_minifloat_quantizer_forward(config, data, lib):
     """
 
 
-def test_binary(data, lib):
+def test_binary(data, lib, fw: FWDict):
     q = BinaryQ()
     print(q)
 
-    arr_py_binary = np.asarray(q(data))
+    arr_py_binary = np.asarray(q(fw['make'](data)))
     arr_c_binary = c_quantize(lib, 'binary', data)
 
     mismatch = np.where(arr_py_binary != arr_c_binary)[0]
@@ -79,11 +80,11 @@ def test_binary(data, lib):
     """
 
 
-def test_ternary(data, lib):
+def test_ternary(data, lib, fw: FWDict):
     q = TernaryQ()
     print(q)
 
-    arr_py_ternary = np.asarray(q(data))
+    arr_py_ternary = np.asarray(q(fw['make'](data)))
     arr_c_ternary = c_quantize(lib, 'ternary', data)
 
     mismatch = np.where(arr_py_ternary != arr_c_ternary)[0]

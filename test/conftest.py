@@ -1,8 +1,19 @@
 import subprocess
+from collections.abc import Callable
+from typing import Any, TypedDict
 
 import numpy as np
 import pytest
 from gen_configs import CPP_SOURCE, gen_configs
+
+
+class FWDict(TypedDict):
+    make: Callable
+    to_np: Callable
+    grad: Callable | None
+    extra: list
+    jit: Callable | None
+    abs: Callable
 
 
 def pytest_sessionstart(session):
@@ -23,27 +34,46 @@ def _numpy():
 
 def _jax():
     jax = pytest.importorskip('jax')
-    return dict(
+    return FWDict(
         make=jax.numpy.asarray,
         to_np=np.asarray,
-        grad=lambda fn, x: jax.grad(lambda x: fn(x).sum())(x),
+        grad=lambda fn, argnums=0: jax.grad(lambda *args: jax.numpy.sum(fn(*args)), argnums=argnums),
         extra=[],
         jit=jax.jit,
+        abs=jax.numpy.abs,
     )
 
 
 def _torch():
     torch = pytest.importorskip('torch')
 
-    def grad(fn, x):
-        x = x.detach().requires_grad_()
-        y = fn(x).sum()
-        if not y.requires_grad:  # independent of x
-            return None
-        y.backward()
-        return x.grad
+    def grad(fn, argnums=0):
+        _argnums = (argnums,) if isinstance(argnums, int) else tuple(argnums)
 
-    return dict(make=torch.as_tensor, to_np=lambda x: x.detach().numpy(), grad=grad, extra=[torch.nn.Parameter(torch.ones(2))])
+        def closure(*args) -> tuple[Any, ...]:
+            xs = [torch.as_tensor(a) for a in args]
+            for i, x in enumerate(xs):
+                if i in _argnums:
+                    x.requires_grad_(True)
+                else:
+                    x.requires_grad_(False)
+            y = fn(*xs)
+            y.sum().backward()
+            r = tuple(x.grad.detach().numpy() for i, x in enumerate(xs) if i in _argnums)
+            if isinstance(argnums, int):
+                return r[0]
+            return r
+
+        return closure
+
+    return FWDict(
+        make=torch.as_tensor,
+        to_np=lambda x: x.detach().numpy(),
+        grad=grad,
+        extra=[torch.nn.Parameter(torch.ones(2))],
+        abs=lambda x: torch.sum(torch.abs(x)),
+        jit=None,
+    )
 
 
 def _tensorflow():
@@ -55,28 +85,31 @@ def _tensorflow():
             y = tf.reduce_sum(fn(x))
         return tape.gradient(y, x)
 
-    return dict(
+    return FWDict(
         make=tf.convert_to_tensor,
         to_np=lambda x: x.numpy(),
         grad=grad,
         extra=[tf.Variable(1.0)],
         jit=lambda fn: tf.function(fn, autograph=False),
+        abs=lambda x: tf.abs,
     )
 
 
 def _mlx():
     mx = pytest.importorskip('mlx.core')
     mx.set_default_device(mx.cpu)
-    return dict(make=mx.array, to_np=np.asarray, grad=lambda fn, x: mx.grad(lambda x: fn(x).sum())(x), extra=[])
+    return dict(make=mx.array, to_np=np.asarray, grad=lambda fn, x: mx.grad(lambda x: fn(x).abs().sum())(x), extra=[])
 
 
 def _tinygrad():
     Tensor = pytest.importorskip('tinygrad').Tensor
-    return dict(
+    return FWDict(
         make=lambda x: Tensor(np.asarray(x), device='CPU'),
         to_np=lambda x: x.numpy(),
         grad=lambda fn, x: fn(x).sum().gradient(x)[0],
         extra=[],
+        jit=None,
+        abs=lambda x: x.abs(),
     )
 
 
@@ -90,11 +123,16 @@ FRAMEWORKS = {
 }
 
 
-@pytest.fixture(params=list(FRAMEWORKS), scope='module')
-def fw(request):
+@pytest.fixture(params=list(FRAMEWORKS), scope='session')
+def _fw(request) -> tuple[str, FWDict]:
     return request.param, FRAMEWORKS[request.param]()
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope='session')
+def fw(_fw):
+    return _fw[1]
+
+
+@pytest.fixture(scope='session')
 def jax_fw():
     return FRAMEWORKS['jax']()
