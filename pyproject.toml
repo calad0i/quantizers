@@ -18,7 +18,7 @@ classifiers = [
   "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
   "Development Status :: 5 - Production/Stable",
 ]
-dynamic = [ "version" ]
+dynamic = ["version"]
 
 
 [project.urls]
@@ -51,14 +51,9 @@ test = [
 ]
 
 [tool.pytest.ini_options]
-filterwarnings = [
+filterwarnings = []
 
-]
-
-env = [
-  "JAX_PLATFORMS=cpu",
-  "CUDA_VISIBLE_DEVICES=-1",
-]
+env = ["JAX_PLATFORMS=cpu", "CUDA_VISIBLE_DEVICES=-1"]
 
 pythonpath = ["test"]
 addopts = "--import-mode=importlib --cov=src/quantizers --cov-report=xml --cov-report=html"
@@ -68,8 +63,10 @@ omit = ["*/_version.py"]
 patch = ["subprocess"]
 
 [tool.coverage.report]
-exclude_lines = ['pragma: no cover', 'if TYPE_CHECKING:']
-
+exclude_also = [
+  '^[ \t]*\.\.\.[ \t]*(?:#.*)?$',
+  '^[ \t]*raise NotImplementedError\b',
+]
 [tool.ruff]
 include = ["src/**/*.py"]
 
