@@ -50,13 +50,11 @@ def _torch():
     def grad(fn, argnums=0):
         _argnums = (argnums,) if isinstance(argnums, int) else tuple(argnums)
 
-        def closure(*args) -> tuple[Any, ...]:
-            xs = [torch.as_tensor(a) for a in args]
+        def closure(*args):
+            xs = [torch.as_tensor(a) if i in _argnums else a for i, a in enumerate(args)]
             for i, x in enumerate(xs):
                 if i in _argnums:
                     x.requires_grad_(True)
-                else:
-                    x.requires_grad_(False)
             y = fn(*xs)
             y.sum().backward()
             r = tuple(x.grad.detach().numpy() for i, x in enumerate(xs) if i in _argnums)
@@ -68,7 +66,7 @@ def _torch():
 
     return FWDict(
         make=torch.as_tensor,
-        to_np=lambda x: x.detach().numpy(),
+        to_np=lambda x: x.detach().numpy() if getattr(x, 'requires_grad', False) else np.asarray(x),
         grad=grad,
         extra=[torch.nn.Parameter(torch.ones(2))],
         abs=lambda x: torch.sum(torch.abs(x)),
@@ -79,11 +77,20 @@ def _torch():
 def _tensorflow():
     tf = pytest.importorskip('tensorflow')
 
-    def grad(fn, x):
-        x = tf.Variable(x)
-        with tf.GradientTape() as tape:
-            y = tf.reduce_sum(fn(x))
-        return tape.gradient(y, x)
+    def grad(fn, argnums=0):
+        _argnums = (argnums,) if isinstance(argnums, int) else tuple(argnums)
+
+        def closure(*args):
+            xs = [tf.convert_to_tensor(a) if i in _argnums else a for i, a in enumerate(args)]
+            with tf.GradientTape() as tape:
+                tape.watch([xs[i] for i in _argnums])
+                y = tf.reduce_sum(fn(*xs))
+            r = tape.gradient(y, [xs[i] for i in _argnums], unconnected_gradients=tf.UnconnectedGradients.ZERO)
+            if isinstance(argnums, int):
+                return r[0]
+            return r
+
+        return closure
 
     return FWDict(
         make=tf.convert_to_tensor,
@@ -91,22 +98,54 @@ def _tensorflow():
         grad=grad,
         extra=[tf.Variable(1.0)],
         jit=lambda fn: tf.function(fn, autograph=False),
-        abs=lambda x: tf.abs,
+        abs=tf.abs,
     )
 
 
 def _mlx():
     mx = pytest.importorskip('mlx.core')
     mx.set_default_device(mx.cpu)
-    return dict(make=mx.array, to_np=np.asarray, grad=lambda fn, x: mx.grad(lambda x: fn(x).abs().sum())(x), extra=[])
+
+    def grad(fn, argnums=0):
+        _argnums = (argnums,) if isinstance(argnums, int) else tuple(argnums)
+
+        def closure(*args) -> tuple[Any, ...]:
+            xs = [mx.array(a) if i in _argnums else a for i, a in enumerate(args)]
+            r = mx.grad(lambda *xs: fn(*xs).sum(), argnums=list(_argnums))(*xs)
+            if isinstance(argnums, int):
+                return r[0]
+            return r
+
+        return closure
+
+    return FWDict(make=mx.array, to_np=np.asarray, grad=grad, extra=[], jit=None, abs=mx.abs)
 
 
 def _tinygrad():
-    Tensor = pytest.importorskip('tinygrad').Tensor
+    tinygrad = pytest.importorskip('tinygrad')
+    from tinygrad.helpers import DEV
+
+    # Default device for the tensors created internally, e.g. by Tensor.gradient. Otherwise tinygrad picks one by reading env
+    # vars named after its devices, and crashes on e.g. CPU=x86_64, set by some shells.
+    DEV.value = 'CPU'
+    Tensor = tinygrad.Tensor
+
+    def grad(fn, argnums=0):
+        _argnums = (argnums,) if isinstance(argnums, int) else tuple(argnums)
+
+        def closure(*args) -> tuple[Any, ...]:
+            xs = [Tensor(np.asarray(a), device='CPU') if i in _argnums else a for i, a in enumerate(args)]
+            r = fn(*xs).sum().gradient(*(xs[i] for i in _argnums))
+            if isinstance(argnums, int):
+                return r[0]
+            return r
+
+        return closure
+
     return FWDict(
         make=lambda x: Tensor(np.asarray(x), device='CPU'),
         to_np=lambda x: x.numpy(),
-        grad=lambda fn, x: fn(x).sum().gradient(x)[0],
+        grad=grad,
         extra=[],
         jit=None,
         abs=lambda x: x.abs(),

@@ -65,6 +65,7 @@ def test_fixed_quantizer_grad(round_mode, overflow_mode, x_kif, fw: FWDict):
         return fw['abs'](x - xq)
 
     dx, di, df = fw['grad'](abs_quantization_err, (0, 2, 3))(x, 1, i, f)
+    dx, di, df = map(fw['to_np'], (dx, di, df))
 
     if overflow_mode == 'WRAP':
         assert np.all(dx == 0), 'X grad Error'
@@ -89,6 +90,7 @@ def test_float_quantizer_grad(xxx_mee0, fw: FWDict):
         return fw['abs'](x - xq)
 
     dx, dm, de, de0 = fw['grad'](quantization_err, range(4))(x_normal, M, E, E0)
+    dx, dm, de, de0 = map(fw['to_np'], (dx, dm, de, de0))
     xq = float_quantize(x_normal, M, E, E0)
     mask = x_normal != xq
     assert np.all(dx == 0), 'Normal Number X grad Error'
@@ -97,6 +99,7 @@ def test_float_quantizer_grad(xxx_mee0, fw: FWDict):
     assert np.all(de0 == 0), 'Normal Number E0 grad Error'
 
     dx, dm, de, de0 = fw['grad'](quantization_err, range(4))(x_subnormal, M, E, E0)
+    dx, dm, de, de0 = map(fw['to_np'], (dx, dm, de, de0))
     xq = float_quantize(x_subnormal, M, E, E0)
     mask = x_subnormal != xq
     assert np.all(dx == 0), 'Subnormal Number X grad Error'
@@ -105,6 +108,7 @@ def test_float_quantizer_grad(xxx_mee0, fw: FWDict):
     assert np.all(de0[mask] > 0), f'Subnormal Number E0 grad Error: max={np.max(de0[mask])}>0'
 
     dx, dm, de, de0 = fw['grad'](quantization_err, range(4))(x_overflow, M, E, E0)
+    dx, dm, de, de0 = map(fw['to_np'], (dx, dm, de, de0))
     assert np.all(dx == 0), 'Overflow Number X grad Error'
     assert np.all(dm == 0), 'Overflow Number M grad Error'
     assert np.all(de < 0), f'Overflow Number E grad Error: max={np.max(de)}>0'
@@ -156,6 +160,7 @@ def test_binary_quantizer_grad(x_kif, fw: FWDict):
     xq = binary_quantize(x)
     assert np.all((xq == -1) | (xq == 1)), 'Binary Quantizer Error'
     grad = fw['grad'](lambda x: binary_quantize(x))(x)
+    grad = fw['to_np'](grad)
     assert np.all(grad > 0), 'Gradient Error'
 
 
@@ -166,4 +171,5 @@ def test_ternary_quantizer_grad(x_kif, fw: FWDict):
     xq = ternary_quantize(x)
     assert np.all((xq == -1) | (xq == 0) | (xq == 1)), 'Ternary Quantizer Error'
     grad = fw['grad'](lambda x: ternary_quantize(x))(x)
+    grad = fw['to_np'](grad)
     assert np.all(grad > 0), 'Gradient Error'
