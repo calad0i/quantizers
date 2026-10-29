@@ -140,7 +140,10 @@ def _tinygrad():
         _argnums = (argnums,) if isinstance(argnums, int) else tuple(argnums)
 
         def closure(*args) -> tuple[Any, ...]:
-            xs = [Tensor(np.asarray(a), device='CPU') if i in _argnums else a for i, a in enumerate(args)]
+            xs = [
+                (a if isinstance(a, Tensor) else Tensor(np.asarray(a), device='CPU')) if i in _argnums else a
+                for i, a in enumerate(args)
+            ]
             r = fn(*xs).sum().gradient(*(xs[i] for i in _argnums))
             if isinstance(argnums, int):
                 return r[0]

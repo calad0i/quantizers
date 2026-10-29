@@ -148,8 +148,10 @@ class FixedPointQuantizer:
     def __call__(self, x, k, i, f):
         bk = get_backend(x)
         k, i, f = (bk.asarray(v, like=x) for v in (k, i, f))
+        has_bits = k + i + f > 0
         i = bk.passthrough(i, bk.where(i > -f, i, -f))  # i >= -f, gradient on i
-        return self.forward(x, k, i, f, bk=bk)
+        xq = self.forward(x, k, i, f, bk=bk)
+        return bk.passthrough(xq, bk.where(has_bits, xq, 0.0))
 
 
 def fixed_quantize(x, k, i, f, round_mode: str = 'TRN', overflow_mode: str = 'WRAP'):

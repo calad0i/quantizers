@@ -83,6 +83,29 @@ def test_fixed_quantizer_grad(round_mode, overflow_mode, x_kif, fw: FWDict):
         assert np.all((df < 0) | (di < 0) | (x == xq) | ((k == 0) & (x < 0))), 'Grad Error for sat mode'
 
 
+@pytest.mark.parametrize('round_mode', ['TRN', 'TRN_ZERO', 'RND', 'RND_CONV', 'RND_ZERO', 'RND_INF', 'RND_MIN_INF'])
+@pytest.mark.parametrize('overflow_mode', ['WRAP', 'SAT', 'SAT_SYM', 'SAT_ZERO'])
+def test_fixed_quantizer_no_bits(round_mode, overflow_mode, x_kif, fw: FWDict):
+    """k + i + f <= 0: qx=0, with the gradients left as they are"""
+    quantizer = FixedPointQuantizer(round_mode, overflow_mode)
+    rng = np.random.default_rng(0)
+    x = np.concatenate([x_kif[0], np.zeros(64, np.float32)])  # exact 0: where clip ties would pass a gradient
+    k = (rng.uniform(size=len(x)) > 0.5).astype(np.float32)
+    f = rng.integers(-4, 8, len(x)).astype(np.float32)
+    i = -f - k - rng.integers(0, 3, len(x)).astype(np.float32)
+    i_clamped = np.maximum(i, -f)
+    x, k, i, f, i_clamped = map(fw['make'], (x, k, i, f, i_clamped))
+
+    np.testing.assert_array_equal(fw['to_np'](quantizer(x, k, i, f)), 0)
+    if fw['grad'] is None:
+        return
+    dx, di, df = fw['grad'](lambda x, i, f: quantizer(x, k, i, f), (0, 1, 2))(x, i, f)  # type: ignore
+    dx, di, df = map(fw['to_np'], (dx, di, df))
+    dx_ref = fw['to_np'](fw['grad'](lambda x: quantizer.forward(x, k, i_clamped, f))(x))  # type: ignore
+    np.testing.assert_array_equal(dx, dx_ref)
+    assert np.any(di) or np.any(df), 'no gradient on i or f'
+
+
 def test_float_quantizer_grad(xxx_mee0, fw: FWDict):
     if fw['grad'] is None:
         pytest.skip('No gradient support')
