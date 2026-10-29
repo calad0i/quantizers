@@ -57,7 +57,12 @@ def _torch():
                     x.requires_grad_(True)
             y = fn(*xs)
             y.sum().backward()
-            r = tuple(x.grad.detach().numpy() for i, x in enumerate(xs) if i in _argnums)
+            r = tuple(
+                np.zeros(x.shape, np.float32) if x.grad is None else x.grad.detach().numpy()
+                for i, x in enumerate(xs)
+                if i in _argnums
+            )
+
             if isinstance(argnums, int):
                 return r[0]
             return r
@@ -112,6 +117,7 @@ def _mlx():
         def closure(*args) -> tuple[Any, ...]:
             xs = [mx.array(a) if i in _argnums else a for i, a in enumerate(args)]
             r = mx.grad(lambda *xs: fn(*xs).sum(), argnums=list(_argnums))(*xs)
+            r = (r,) if len(_argnums) == 1 else tuple(r)
             if isinstance(argnums, int):
                 return r[0]
             return r
