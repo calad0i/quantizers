@@ -68,9 +68,13 @@ def test_fixed_quantizer_grad(round_mode, overflow_mode, x_kif, fw: FWDict):
     dx, di, df = map(fw['to_np'], (dx, di, df))
 
     if overflow_mode == 'WRAP':
-        assert np.all(dx == 0), 'X grad Error'
+        xr = quantizer.round(x, f)  # wrapping acts on the rounded values
+        overflow = (xr < -(2**i)) | (xr > 2**i - 2**-f)
+        dqx = fw['to_np'](fw['grad'](lambda x, i, f: quantizer(x, 1, i, f))(x, i, f))  # type: ignore
+        assert np.all((dqx == 1) ^ overflow), 'X grad Error in WRAP op'
+        assert np.all(dx[~overflow] == 0), 'X grad Error'
         assert np.all(di == 0), 'I grad Error'
-        assert np.all((df < 0) | (x < -(2**i)) | (x > 2**i - 2**-f) | (x == quantizer(x, 1, i, f))), 'F grad Error'
+        assert np.all((df < 0) | overflow | (x == quantizer(x, 1, i, f))), 'F grad Error'
     elif overflow_mode in ('SAT', 'SAT_SYM'):
         for _dx in np.unique(dx):
             assert _dx in (-1, 0, 1), 'X grad Error'

@@ -54,27 +54,27 @@ class AbstractBackend:
         """`x` if it is native to the backend, else `x` converted to a native tensor with the dtype and device of `like`."""
         return x if self.is_appropriate_type(x) else self._asarray(x, like)
 
-    def _asarray(self, x, like): ...
+    def _asarray(self, x, like) -> Any: ...
 
     def _floor(self, x): ...
 
-    def _round_conv(self, x):
+    def _round_conv(self, x) -> Any:
         """Round to nearest, ties to even."""
         ...
 
-    def _clip(self, x, min_value, max_value): ...
+    def _clip(self, x, min_value, max_value) -> Any: ...
 
-    def abs(self, x): ...
+    def abs(self, x) -> Any: ...
 
-    def where(self, cond, x, y):
+    def where(self, cond, x, y) -> Any:
         """`cond` must be a native tensor; `x` and `y` may be python scalars."""
         ...
 
-    def log2(self, x): ...
+    def log2(self, x) -> Any: ...
 
-    def tanh(self, x): ...
+    def tanh(self, x) -> Any: ...
 
-    def stop_gradient(self, x): ...
+    def stop_gradient(self, x) -> Any: ...
 
     def surrogate(self, value, *grads):
         """`value`, with gradient `c` w.r.t. `x` for each `(x, c)` in `grads`; `c=None` passes the gradient through.
@@ -82,15 +82,7 @@ class AbstractBackend:
         grads = [(x, c) for x, c in grads if not isinstance(x, Number)]
         return self._surrogate(value, [x for x, _ in grads], [c for _, c in grads])
 
-    def _surrogate(self, value, xs, cs):
-        # Fallback for frameworks without custom gradients: zero-valued terms carrying the gradient
-        sg = self.stop_gradient
-        r = sg(value)
-        for x, c in zip(xs, cs):
-            d = x - sg(x)
-            r = r + (d if c is None else d * sg(c))
-        return r
-
+    def _surrogate(self, value, xs, cs) -> Any: ...
     def passthrough(self, x, r):
         """Value of `r`, gradient passed through to `x`."""
         return self.surrogate(r, (x, None))
@@ -434,6 +426,13 @@ class TinygradBackend(AbstractBackend):
     def stop_gradient(self, x):
         # adding kernel boundary keeping values exact in wrap
         return x.detach().contiguous()
+
+    def _surrogate(self, value, xs, cs):
+        r = self.stop_gradient(value)
+        for x, c in zip(xs, cs):
+            d = x - x.detach()
+            r = r + (d if c is None else d * self.stop_gradient(c))
+        return r
 
 
 class KerasBackend(AbstractBackend):

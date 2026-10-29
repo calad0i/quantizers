@@ -82,7 +82,8 @@ def wrap(x, k, i, f, bk: AbstractBackend | None = None):
     bk = bk or get_backend(x)
     b = i + k
     bias = k * 2.0 ** (b - 1)
-    return bk.passthrough(x, (x + bias) % (2.0**b) - bias)
+    in_range = (x >= -bias) & (x <= 2.0**i - 2.0**-f)
+    return bk.where(in_range, x, bk.stop_gradient((x + bias) % (2.0**b) - bias))
 
 
 @sat_mode('SAT')
@@ -128,16 +129,12 @@ class FixedPointQuantizer:
         self.round_fn = round_fn
 
     def forward(self, x, k, i, f, bk: AbstractBackend | None = None):
-        # Workaround for gradient computation around 0.
-        # When have values outside boundary rounded to boundary, grad on f presents despite the value will be clipped off anyway.
-        # Thus have saturation before rounding, except for wrap mode, which doesn't round during training.
+        # Saturation before rounding: values out of range rounded onto the boundary would get a gradient on f, though clipped
+        # off anyway. Wrapping after rounding, which may carry values out of range.
         bk = bk or get_backend(x)
-        if self.overflow_mode != 'WRAP':
-            x = self.saturate(x, k, i, f, bk=bk)
-        x = self.round(x, f, bk=bk)
         if self.overflow_mode == 'WRAP':
-            x = self.saturate(x, k, i, f, bk=bk)
-        return x
+            return self.saturate(self.round(x, f, bk=bk), k, i, f, bk=bk)
+        return self.round(self.saturate(x, k, i, f, bk=bk), f, bk=bk)
 
     def __call__(self, x, k, i, f):
         bk = get_backend(x)
