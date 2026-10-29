@@ -48,7 +48,7 @@ def xxx_mee0():
 
 
 @pytest.mark.parametrize('round_mode', ['TRN', 'TRN_ZERO', 'RND', 'RND_CONV', 'RND_ZERO', 'RND_INF', 'RND_MIN_INF'])
-@pytest.mark.parametrize('overflow_mode', ['WRAP', 'SAT', 'SAT_SYM'])
+@pytest.mark.parametrize('overflow_mode', ['WRAP', 'SAT', 'SAT_SYM', 'SAT_ZERO'])
 def test_fixed_quantizer_grad(round_mode, overflow_mode, x_kif, fw: FWDict):
     if fw['grad'] is None:
         pytest.skip('No gradient support')
@@ -67,11 +67,11 @@ def test_fixed_quantizer_grad(round_mode, overflow_mode, x_kif, fw: FWDict):
     dx, di, df = fw['grad'](abs_quantization_err, (0, 2, 3))(x, 1, i, f)
     dx, di, df = map(fw['to_np'], (dx, di, df))
 
-    if overflow_mode == 'WRAP':
-        xr = quantizer.round(x, f)  # wrapping acts on the rounded values
+    if overflow_mode in ('WRAP', 'SAT_ZERO'):
+        xr = quantizer.round(x, f)  # wrapping and zeroing act on the rounded values
         overflow = (xr < -(2**i)) | (xr > 2**i - 2**-f)
         dqx = fw['to_np'](fw['grad'](lambda x, i, f: quantizer(x, 1, i, f))(x, i, f))  # type: ignore
-        assert np.all((dqx == 1) ^ overflow), 'X grad Error in WRAP op'
+        assert np.all((dqx == 1) ^ overflow), f'X grad Error in {overflow_mode} op'
         assert np.all(dx[~overflow] == 0), 'X grad Error'
         assert np.all(di == 0), 'I grad Error'
         assert np.all((df < 0) | overflow | (x == quantizer(x, 1, i, f))), 'F grad Error'
