@@ -12,7 +12,7 @@ MATCH_TEST_S = [0, 1]
 MATCH_TEST_W = [1, 2, 7, 12]
 MATCH_TEST_I = [-5, 0, 8]
 MATCH_TEST_RND = ['TRN', 'TRN_ZERO', 'RND', 'RND_CONV', 'RND_ZERO', 'RND_INF', 'RND_MIN_INF']
-MATCH_TEST_SAT = ['WRAP', 'SAT', 'SAT_SYM']
+MATCH_TEST_SAT = ['WRAP', 'SAT', 'SAT_SYM', 'SAT_ZERO']
 
 # (S, W, I, RND, SAT). Signed 1-bit SAT_SYM is excluded as it is not symmetric at all...
 MATCH_CONFIGS_FIXED = [

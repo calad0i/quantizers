@@ -86,6 +86,15 @@ def wrap(x, k, i, f, bk: AbstractBackend | None = None):
     return bk.where(in_range, x, bk.stop_gradient((x + bias) % (2.0**b) - bias))
 
 
+@sat_mode('SAT_ZERO')
+def sat_zero(x, k, i, f, bk: AbstractBackend | None = None):
+    bk = bk or get_backend(x)
+    b = i + k
+    bias = k * 2.0 ** (b - 1)
+    in_range = (x >= -bias) & (x <= 2.0**i - 2.0**-f)
+    return bk.where(in_range, x, 0.0)
+
+
 @sat_mode('SAT')
 def sat(x, k, i, f, bk: AbstractBackend | None = None):
     bk = bk or get_backend(x)
@@ -130,9 +139,9 @@ class FixedPointQuantizer:
 
     def forward(self, x, k, i, f, bk: AbstractBackend | None = None):
         # Saturation before rounding: values out of range rounded onto the boundary would get a gradient on f, though clipped
-        # off anyway. Wrapping after rounding, which may carry values out of range.
+        # off anyway. Wrapping and zeroing after rounding, which decides whether a value overflows.
         bk = bk or get_backend(x)
-        if self.overflow_mode == 'WRAP':
+        if self.overflow_mode in ('WRAP', 'SAT_ZERO'):
             return self.saturate(self.round(x, f, bk=bk), k, i, f, bk=bk)
         return self.round(self.saturate(x, k, i, f, bk=bk), f, bk=bk)
 
