@@ -127,7 +127,7 @@ class FixedPointQuantizer:
         bk = bk or get_backend(x)
         return self.sat_fn(x, k, i, f, bk=bk)
 
-    def __init__(self, round_mode: str = 'TRN', overflow_mode: str = 'WRAP'):
+    def __init__(self, round_mode: str = 'TRN', overflow_mode: str = 'WRAP', null_xgrad_on_zero_width: bool = False):
         round_mode = round_mode.upper()
         overflow_mode = overflow_mode.upper()
         self.round_mode = round_mode
@@ -136,6 +136,7 @@ class FixedPointQuantizer:
         sat_fn = saturation_mode_registry[overflow_mode]
         self.sat_fn = sat_fn
         self.round_fn = round_fn
+        self.null_xgrad_on_zero_width = null_xgrad_on_zero_width
 
     def forward(self, x, k, i, f, bk: AbstractBackend | None = None):
         # Saturation before rounding: values out of range rounded onto the boundary would get a gradient on f, though clipped
@@ -150,6 +151,8 @@ class FixedPointQuantizer:
         k, i, f = (bk.asarray(v, like=x) for v in (k, i, f))
         has_bits = k + i + f > 0
         i = bk.passthrough(i, bk.where(i > -f, i, -f))  # i >= -f, gradient on i
+        if self.null_xgrad_on_zero_width:
+            x = bk.where(has_bits, x, bk.stop_gradient(x))
         xq = self.forward(x, k, i, f, bk=bk)
         return bk.passthrough(xq, bk.where(has_bits, xq, 0.0))
 
