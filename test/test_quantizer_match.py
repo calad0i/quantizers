@@ -35,15 +35,19 @@ def test_fixed_quantizer_forward(config, data, lib, fw: FWDict):
     fixed_q = FixedQ(W, I, S, RND, SAT)
     print(fixed_q)
 
-    arr_py_fixed = fw['to_np'](fixed_q(fw['make'](data)))
-    arr_c_fixed = c_quantize(lib, fixed_symbol(*config), data)
+    # Nasty edge cases
+    ties = ((np.arange(-256, 256) + 0.5) * 2.0 ** (I - W)).astype(np.float32)
+    x = np.concatenate([data, ties, np.nextafter(ties, np.float32(-np.inf)), np.nextafter(ties, np.float32(np.inf))])
+
+    arr_py_fixed = fw['to_np'](fixed_q(fw['make'](x)))
+    arr_c_fixed = c_quantize(lib, fixed_symbol(*config), x)
 
     mismatch = np.where(arr_py_fixed != arr_c_fixed)[0]
     assert len(mismatch) == 0, f"""Fixed quantizer has inconsistent behavior with C++ implementation:
         [* {len(mismatch)} mismatches, {min(len(mismatch), 5)} shown *]
         C++: {arr_c_fixed[mismatch][:5]}
         Py: {arr_py_fixed[mismatch][:5]}
-        in: {data[mismatch][:5]}
+        in: {x[mismatch][:5]}
     """
 
 

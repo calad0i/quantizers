@@ -16,6 +16,13 @@ def rnd_mode(name: str):
     return inner
 
 
+def _round_half(x, half, bk: AbstractBackend):
+    # round_conv is exact, floor(x+0.5) and friends are not. fp32 magic to make exact floor(x+0.5)...
+    r = bk.round_conv(x)
+    d = bk.stop_gradient(x - r)
+    return r + bk.where(bk.abs(d) == 0.5, d + half, 0.0)
+
+
 @rnd_mode('TRN')
 def floor(x, bk: AbstractBackend | None = None):
     bk = bk or get_backend(x)
@@ -26,7 +33,7 @@ def floor(x, bk: AbstractBackend | None = None):
 def round(x, bk: AbstractBackend | None = None):
     # Round to nearest, ties positive infinity.
     bk = bk or get_backend(x)
-    return bk.floor(x + 0.5)
+    return _round_half(x, 0.5, bk)
 
 
 @rnd_mode('RND_CONV')
@@ -47,21 +54,21 @@ def floor_zero(x, bk: AbstractBackend | None = None):
 def round_zero(x, bk: AbstractBackend | None = None):
     # Round to nearest, ties towards zero.
     bk = bk or get_backend(x)
-    return bk.where(x < 0, bk.floor(x + 0.5), -bk.floor(-x + 0.5))
+    return _round_half(x, bk.where(x < 0, 0.5, -0.5), bk)
 
 
 @rnd_mode('RND_MIN_INF')
 def round_min_inf(x, bk: AbstractBackend | None = None):
     # Round to nearest, ties towards negative infinity.
     bk = bk or get_backend(x)
-    return -bk.floor(-x + 0.5)
+    return _round_half(x, -0.5, bk)
 
 
 @rnd_mode('RND_INF')
 def round_inf(x, bk: AbstractBackend | None = None):
     # Round to nearest, ties away from zero.
     bk = bk or get_backend(x)
-    return bk.where(x < 0, -bk.floor(-x + 0.5), bk.floor(x + 0.5))
+    return _round_half(x, bk.where(x < 0, -0.5, 0.5), bk)
 
 
 def sat_mode(name: str | list | tuple):
