@@ -406,7 +406,7 @@ class TinygradBackend(AbstractBackend):
         return x.floor()
 
     def _round_conv(self, x):
-        return x.round()
+        return (x == x.trunc()).where(x, x.round())
 
     def _clip(self, x, min_value, max_value):
         return x.maximum(min_value).minimum(max_value)
