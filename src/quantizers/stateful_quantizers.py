@@ -1,19 +1,20 @@
-from typing import Any, TypeVar, overload
-
-import numpy as np
+from typing import TYPE_CHECKING, Any, TypeVar, overload
 
 from .binary import binary_quantize, ternary_quantize
 from .fixed_point import fixed_quantize
 from .minifloat import float_quantize
 
-T = TypeVar('T', np.ndarray, float, int)
+if TYPE_CHECKING:
+    import numpy as np
+
+T = TypeVar('T', 'np.ndarray', float, int)
 
 
 class BinaryQ:
     """Stateful binary quantizer."""
 
     @overload
-    def __call__(self, x: T) -> np.ndarray: ...
+    def __call__(self, x: T) -> 'np.ndarray': ...
 
     @overload
     def __call__(self, x: Any) -> Any: ...
@@ -29,7 +30,7 @@ class TernaryQ:
     """Stateful ternary quantizer."""
 
     @overload
-    def __call__(self, x: T) -> np.ndarray: ...
+    def __call__(self, x: T) -> 'np.ndarray': ...
 
     @overload
     def __call__(self, x: Any) -> Any: ...
@@ -66,7 +67,7 @@ class FixedQ:
         self.overflow = overflow
 
     @overload
-    def __call__(self, x: T) -> np.ndarray: ...
+    def __call__(self, x: T) -> 'np.ndarray': ...
 
     @overload
     def __call__(self, x: Any) -> Any: ...
@@ -98,7 +99,7 @@ class MinifloatQ:
         self.exponent_bias = exponent_bias
 
     @overload
-    def __call__(self, x: T) -> np.ndarray: ...
+    def __call__(self, x: T) -> 'np.ndarray': ...
 
     @overload
     def __call__(self, x: Any) -> Any: ...
