@@ -64,8 +64,8 @@ def dynamo_cold():
     torch = pytest.importorskip('torch')
     from quantizers import _backends
 
-    _backends._backend_of.cache_clear()  # type: ignore
-    _backends._Singleton.__call__.cache_clear()  # type: ignore
+    _backends._backends.clear()
+    _backends._type2name.clear()
     torch._dynamo.reset()
     torch._dynamo.utils.counters.clear()
     yield torch._dynamo.utils.counters
