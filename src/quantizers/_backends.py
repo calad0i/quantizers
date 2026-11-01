@@ -5,27 +5,36 @@ Author: "Alex Rogozhnikov"
 Dispatch goes by the module a tensor's type comes from, so it never imports a framework (but numpy, for python scalars).
 """
 
-import functools
 import math
 import sys
 from numbers import Number
 from typing import Any
 
+_backends: dict[str, 'AbstractBackend'] = {}
+_type2name: dict[type, str] = {}
+
 
 def get_backend(tensor) -> 'AbstractBackend':
     """Backend for the type of `tensor`. Python and numpy scalars go to the numpy backend."""
-    return _backend_of(type(tensor))
+    return _backends[_backend_name(type(tensor))]
 
 
-@functools.cache
-def _backend_of(_type: type) -> 'AbstractBackend':
-    if (backend_cls := _module_backend(_type)) is not None:
-        return backend_cls()
+def _backend_name(_type: type) -> str:
+    name = _type2name.get(_type)
+    if name is None:
+        name = _type2name[_type] = _backend_class(_type)().name
+    return name
+
+
+_backend_name._dynamo_marked_constant = True  # type: ignore
+
+
+def _backend_class(_type: type) -> type['AbstractBackend']:
     for cls in _type.__mro__:
         if (backend_cls := _module_backend(cls)) is not None:
-            return backend_cls()
+            return backend_cls
     if issubclass(_type, Number):
-        return NumpyBackend()
+        return NumpyBackend
     raise TypeError(f'No backend found for tensor type {_type}')
 
 
@@ -36,14 +45,14 @@ def _module_backend(cls: type):
 
 
 class _Singleton(type):
-    @functools.cache
     def __call__(cls):
-        return super().__call__()
+        if cls.name not in _backends:  # type: ignore
+            _backends[cls.name] = super().__call__()  # type: ignore
+        return _backends[cls.name]  # type: ignore
 
 
 class AbstractBackend(metaclass=_Singleton):
-    """Native ops used by the quantizers. Arguments other than the first may be python scalars, except for `where`.
-    Keras Variables are only unwrapped when they are the dispatch key; elsewhere, pass `.value`."""
+    """Native ops used by the quantizers. Arguments other than the first may be python scalars, except for `where`."""
 
     name: str
     differentiable: bool = True

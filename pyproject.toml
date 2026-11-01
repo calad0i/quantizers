@@ -48,12 +48,13 @@ test = [
   'tinygrad',
   'mlx[cpu]',
   'keras>=3.0.0',
+  'triton; sys_platform == "linux"',
 ]
 
 [tool.pytest.ini_options]
 filterwarnings = []
 
-env = ["JAX_PLATFORMS=cpu", "CUDA_VISIBLE_DEVICES=-1"]
+env = ["JAX_PLATFORMS=cpu", "CUDA_VISIBLE_DEVICES=-1", "TRITON_INTERPRET=1"]
 
 pythonpath = ["test"]
 addopts = "--import-mode=importlib --cov=src/quantizers --cov-report=xml --cov-report=html"
