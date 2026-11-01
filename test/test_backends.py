@@ -32,6 +32,65 @@ def test_dispatch_jax_jit():
     np.testing.assert_array_equal(fn(X), np.floor(X))
 
 
+def _quantizer(name):
+    from quantizers import binary_quantize, fixed_quantize, float_quantize
+
+    return {
+        'fixed': lambda x, i: fixed_quantize(x, 1.0, i, 3.0, 'RND', 'SAT'),
+        'binary': lambda x, i: binary_quantize(x) * i,
+        'float': lambda x, i: float_quantize(x, 3.0, 4.0, i),
+    }[name]
+
+
+def _torch_grads(name: str, compile: bool, ckpt: bool = False):
+    import torch
+    from torch.utils.checkpoint import checkpoint
+
+    fn = _quantizer(name)
+
+    def step(x, i):
+        xq = checkpoint(fn, x, i, use_reentrant=False) if ckpt else fn(x, i)
+        xq.square().sum().backward()  # type: ignore
+
+    # Parameter: dynamo special-cases its type
+    x, i = torch.nn.Parameter(torch.tensor(X)), torch.ones(len(X), requires_grad=True)
+    (torch.compile(step, backend='eager') if compile else step)(x, i)
+    return x.grad.detach().numpy(), i.grad.detach().numpy()  # type: ignore
+
+
+@pytest.fixture
+def dynamo_cold():
+    """Fresh dynamo, with the backend caches cleared"""
+    torch = pytest.importorskip('torch')
+    from quantizers import _backends
+
+    _backends._backend_of.cache_clear()  # type: ignore
+    _backends._Singleton.__call__.cache_clear()  # type: ignore
+    torch._dynamo.reset()
+    torch._dynamo.utils.counters.clear()
+    yield torch._dynamo.utils.counters
+    torch._dynamo.reset()
+
+
+def test_torch_compile_cold_dispatch(dynamo_cold):
+    """First dispatch in a checkpointed region"""
+    grads = _torch_grads('fixed', compile=True, ckpt=True)
+    assert {k.splitlines()[0] for k in dynamo_cold['graph_break']} == {'Unsupported Tensor.backward() call'}
+    for g, ref in zip(grads, _torch_grads('fixed', compile=False)):
+        np.testing.assert_array_equal(g, ref)
+
+
+@pytest.mark.parametrize('name', ['fixed', 'binary', 'float'])
+def test_torch_compiled_autograd(dynamo_cold, name):
+    """compiled autograd fails on a None gradient for an input requiring grad, detached so no None is applied"""
+    import torch
+
+    with torch._dynamo.config.patch(compiled_autograd=True):
+        grads = _torch_grads(name, compile=True)
+    for g, ref in zip(grads, _torch_grads(name, compile=False)):
+        np.testing.assert_array_equal(g, ref)
+
+
 def test_jax_partial_grad():
     """jax grad with only some of the parameters differentiable"""
     jax = pytest.importorskip('jax')

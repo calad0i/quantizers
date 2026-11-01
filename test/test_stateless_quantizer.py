@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import pytest
 from conftest import FWDict
@@ -10,14 +12,17 @@ from quantizers import (
     ternary_quantize,
 )
 
+SEED = int(os.environ.get('PYTEST_SEED', 0))
+
 
 @pytest.fixture(scope='module')
 def x_kif():
     N = (100000,)
-    k = np.random.rand(N[0]) > 0.5
-    i = np.random.randint(-4, 8, N).astype(np.float32)
-    f = np.random.randint(-4, 8, N).astype(np.float32)
-    x = np.random.normal(size=N).astype(np.float32)
+    rng = np.random.default_rng(SEED)
+    k = rng.random(N[0]) > 0.5
+    i = rng.integers(-4, 8, N).astype(np.float32)
+    f = rng.integers(-4, 8, N).astype(np.float32)
+    x = rng.normal(size=N).astype(np.float32)
     f = np.maximum(f, np.where(k, -i, -i + 1))
     return x, k, i, f
 
@@ -25,10 +30,11 @@ def x_kif():
 @pytest.fixture(scope='module')
 def xxx_mee0():
     N = (100000,)
-    M = np.random.randint(1, 9, N).astype(np.float32)
-    E = np.random.randint(1, 4, N).astype(np.float32)
-    E0 = np.random.randint(-8, 8, N).astype(np.float32)
-    x = np.random.uniform(-1.0, 1.0, N).astype(np.float32)
+    rng = np.random.default_rng(SEED + 1)
+    M = rng.integers(1, 9, N).astype(np.float32)
+    E = rng.integers(1, 4, N).astype(np.float32)
+    E0 = rng.integers(-8, 8, N).astype(np.float32)
+    x = rng.uniform(-1.0, 1.0, N).astype(np.float32)
 
     sign = np.sign(x)
     x = np.abs(x)

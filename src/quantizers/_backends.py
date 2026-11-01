@@ -2,43 +2,46 @@
 Backend dispatch adapted from `einops` (https://github.com/arogozhnikov/einops/), MIT license
 Author: "Alex Rogozhnikov"
 
-A backend is only considered when its framework is already imported, so dispatching never imports a framework.
+Dispatch goes by the module a tensor's type comes from, so it never imports a framework (but numpy, for python scalars).
 """
 
+import functools
 import math
 import sys
 from numbers import Number
 from typing import Any
 
-_loaded_backends: dict[str, 'AbstractBackend'] = {}
-_type2backend: dict[type, 'AbstractBackend'] = {}
-
 
 def get_backend(tensor) -> 'AbstractBackend':
     """Backend for the type of `tensor`. Python and numpy scalars go to the numpy backend."""
-    _type = type(tensor)
-    backend = _type2backend.get(_type)
-    if backend is not None:
-        return backend
+    return _backend_of(type(tensor))
 
-    # Only the matching backend is created: creating others may not be traceable (e.g. by dynamo) or needed
-    for backend_cls in _backend_classes:
-        if backend_cls.name in sys.modules and backend_cls.is_appropriate_type(tensor):
-            backend = _type2backend[_type] = _load(backend_cls)
-            return backend
 
+@functools.cache
+def _backend_of(_type: type) -> 'AbstractBackend':
+    if (backend_cls := _module_backend(_type)) is not None:
+        return backend_cls()
+    for cls in _type.__mro__:
+        if (backend_cls := _module_backend(cls)) is not None:
+            return backend_cls()
+    if issubclass(_type, Number):
+        return NumpyBackend()
     raise TypeError(f'No backend found for tensor type {_type}')
 
 
-def _load(backend_cls: type['AbstractBackend']) -> 'AbstractBackend':
-    name = backend_cls.name
-    backend = _loaded_backends.get(name)
-    if backend is None:
-        backend = _loaded_backends.setdefault(name, backend_cls())
-    return backend
+def _module_backend(cls: type):
+    # frameworks by root pkg, quantizers provided ones using own tensor types (e.g., quantizers.triton) by subpackage
+    parts = cls.__module__.split('.', 2)
+    return _module2backend.get('.'.join(parts[:2])) or _module2backend.get(parts[0])
 
 
-class AbstractBackend:
+class _Singleton(type):
+    @functools.cache
+    def __call__(cls):
+        return super().__call__()
+
+
+class AbstractBackend(metaclass=_Singleton):
     """Native ops used by the quantizers. Arguments other than the first may be python scalars, except for `where`.
     Keras Variables are only unwrapped when they are the dispatch key; elsewhere, pass `.value`."""
 
@@ -250,7 +253,10 @@ class TorchBackend(AbstractBackend):
         # Nothing to route without grads; dynamo also fails to trace the Function when no input requires grad
         if not self.torch.is_grad_enabled() or not any(x.requires_grad for x in xs):
             return value.detach()
-        return self._Surrogate.apply(value, *(v for xc in zip(xs, cs) for v in xc))
+        # No gradient flows into value and the cs (backward returns None for them), so they go in detached
+        # or compiled autograd will crash on None grad for inputs requiring it
+        cs = [c if c is None else c.detach() for c in cs]
+        return self._Surrogate.apply(value.detach(), *(v for xc in zip(xs, cs) for v in xc))
 
 
 class TensorflowBackend(AbstractBackend):
@@ -435,6 +441,51 @@ class TinygradBackend(AbstractBackend):
         return r
 
 
+class TritonBackend(AbstractBackend):
+    """Values in a Triton kernel being compiled (`quantizers.triton`), differentiated by the tape of their lowering."""
+
+    name = 'triton'
+
+    def __init__(self):
+        from .triton import _lowering
+
+        self.ops = _lowering
+
+    @classmethod
+    def is_appropriate_type(cls, tensor):
+        return isinstance(tensor, sys.modules['quantizers.triton._lowering'].Value)
+
+    def _asarray(self, x, like):
+        return self.ops.const(x, like)
+
+    def _floor(self, x):
+        return self.ops.floor(x)
+
+    def _round_conv(self, x):
+        return self.ops.round_conv(x)
+
+    def _clip(self, x, min_value, max_value):
+        return self.ops.clip(x, min_value, max_value)
+
+    def abs(self, x):
+        return self.ops.abs(x)
+
+    def where(self, cond, x, y):
+        return self.ops.where(cond, x, y)
+
+    def log2(self, x):
+        return self.ops.log2(x)
+
+    def tanh(self, x):
+        return self.ops.tanh(x)
+
+    def stop_gradient(self, x):
+        return self.ops.stop_gradient(x)
+
+    def _surrogate(self, value, xs, cs):
+        return self.ops.surrogate(value, xs, cs)
+
+
 class KerasBackend(AbstractBackend):
     """Thin shim for keras 3 Variables: unwraps them to `.value` and delegates to the backend keras runs on."""
 
@@ -448,7 +499,7 @@ class KerasBackend(AbstractBackend):
         self.Variable = keras.Variable
         native_cls = {cls.name: cls for cls in (JaxBackend, TorchBackend, TensorflowBackend, NumpyBackend)}
         assert keras.backend.backend() in native_cls, f'Keras backend {keras.backend.backend()} is not supported'
-        self.native = _load(native_cls[keras.backend.backend()])
+        self.native = native_cls[keras.backend.backend()]()
 
     @classmethod
     def is_appropriate_type(cls, tensor):
@@ -481,13 +532,16 @@ for _name, _attr in list(vars(AbstractBackend).items()):
         setattr(KerasBackend, _name, _delegate(_name))
 
 
-# keras first: tf.is_tensor is True for keras Variables on the tensorflow backend. numpy last: it accepts python scalars.
-_backend_classes: tuple[type[AbstractBackend], ...] = (
-    KerasBackend,
-    JaxBackend,
-    TorchBackend,
-    TensorflowBackend,
-    MLXBackend,
-    TinygradBackend,
-    NumpyBackend,
-)
+# Keyed on the module, or its root package, of each class in the MRO: the first match wins, e.g. keras for keras Variables
+# on tensorflow
+_module2backend: dict[str, type[AbstractBackend]] = {
+    'keras': KerasBackend,
+    'jax': JaxBackend,
+    'jaxlib': JaxBackend,
+    'torch': TorchBackend,
+    'tensorflow': TensorflowBackend,
+    'mlx': MLXBackend,
+    'tinygrad': TinygradBackend,
+    'numpy': NumpyBackend,
+    'quantizers.triton': TritonBackend,
+}
