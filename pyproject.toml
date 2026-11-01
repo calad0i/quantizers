@@ -35,8 +35,8 @@ package-dir = { "" = "src" }
 write_to = "src/quantizers/_version.py"
 
 [project.optional-dependencies]
-dependencies = ["numpy"]
-
+keras = ["keras>=3.0.0"]
+torch = ["torch>=2.12"]
 test = [
   'pytest',
   'pytest-cov',
