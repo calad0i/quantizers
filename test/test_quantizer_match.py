@@ -6,8 +6,6 @@ from conftest import FWDict
 from gen_configs import LIB_PATH, MATCH_CONFIGS_FIXED, MATCH_CONFIGS_FLOAT, fixed_symbol, float_symbol
 from numpy.ctypeslib import ndpointer
 
-from quantizers import BinaryQ, FixedQ, MinifloatQ, TernaryQ
-
 
 @pytest.fixture(scope='session')
 def lib():
@@ -32,7 +30,7 @@ def c_quantize(lib, symbol: str, x: np.ndarray, dtype: type = np.float32) -> np.
 @pytest.mark.parametrize('config', MATCH_CONFIGS_FIXED, ids=lambda c: fixed_symbol(*c))
 def test_fixed_quantizer_forward(config, data, lib, fw: FWDict):
     S, W, I, RND, SAT = config
-    fixed_q = FixedQ(W, I, S, RND, SAT)
+    fixed_q = fw['q'].FixedQ(W, I, S, RND, SAT)
     print(fixed_q)
 
     # Nasty edge cases
@@ -53,7 +51,7 @@ def test_fixed_quantizer_forward(config, data, lib, fw: FWDict):
 
 @pytest.mark.parametrize('config', MATCH_CONFIGS_FLOAT, ids=lambda c: float_symbol(*c))
 def test_minifloat_quantizer_forward(config, data, lib, fw: FWDict):
-    q = MinifloatQ(*config)
+    q = fw['q'].MinifloatQ(*config)
     print(q)
 
     arr_py_float = fw['to_np'](q(fw['make'](data)))
@@ -69,7 +67,7 @@ def test_minifloat_quantizer_forward(config, data, lib, fw: FWDict):
 
 
 def test_binary(data, lib, fw: FWDict):
-    q = BinaryQ()
+    q = fw['q'].BinaryQ()
     print(q)
 
     arr_py_binary = fw['to_np'](q(fw['make'](data)))
@@ -85,7 +83,7 @@ def test_binary(data, lib, fw: FWDict):
 
 
 def test_ternary(data, lib, fw: FWDict):
-    q = TernaryQ()
+    q = fw['q'].TernaryQ()
     print(q)
 
     arr_py_ternary = fw['to_np'](q(fw['make'](data)))
