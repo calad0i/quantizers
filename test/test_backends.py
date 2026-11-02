@@ -6,11 +6,17 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from conftest import FWDict
+from conftest import FRAMEWORKS, FWDict
 
 from quantizers._backends import KerasBackend, NumpyBackend, get_backend
 
 X = np.array([-2.5, -1.5, -0.75, -0.5, 0.0, 0.5, 0.75, 1.5, 2.5, 3.25], np.float32)
+
+
+@pytest.fixture(params=[name for name in FRAMEWORKS if name != 'triton'], scope='session')
+def fw(request) -> FWDict:
+    """Tensor frameworks only: Triton's quantizers are not a backend"""
+    return FRAMEWORKS[request.param]()
 
 
 def test_dispatch(fw: FWDict):

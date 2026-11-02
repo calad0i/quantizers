@@ -45,14 +45,13 @@ def constexpr_value(v):
 
 
 class Lowering:
-    """The semantic and libdevice of one lowering, and the order of its tape."""
+    """The semantic of one lowering, and the order of its tape."""
 
     def __init__(self, sem):
         from triton import knobs
 
         self.sem = sem
         self.interp = bool(knobs.runtime.interpret)
-        self.lib = None if self.interp else sem.builder.module_map.get('triton.language.extra.libdevice')
         self.n = 0
 
     def tensor(self, v):
@@ -75,9 +74,8 @@ class Lowering:
         """libdevice's `name`, or numpy's in the interpreter, which has no libdevice."""
         args = tl.broadcast(*map(self.tensor, args), _semantic=self.sem) if len(args) > 1 else (self.tensor(args[0]),)
         if not self.interp:
-            if self.lib is None:
-                raise NotImplementedError(f'{name}: no libdevice on this Triton target')
-            return getattr(self.lib, name)(*args, _semantic=self.sem)
+            lib = self.sem.builder.module_map['triton.language.extra.libdevice']
+            return getattr(lib, name)(*args, _semantic=self.sem)
         import numpy as np
         from triton.runtime.interpreter import TensorHandle
 
@@ -110,9 +108,7 @@ class Lowering:
                 stack.extend(p for p, _ in v.parents)
         adj = {id(y): g}
         for v in sorted(reached.values(), key=lambda v: v.idx, reverse=True):  # reverse creation: children first
-            ct = adj.get(id(v))
-            if ct is None:
-                continue
+            ct = adj[id(v)]
             for p, rule in v.parents:
                 c = rule(ct)
                 old = adj.get(id(p))
@@ -135,9 +131,6 @@ class Value:
         self.parents = tuple((p, r) for p, r in parents if isinstance(p, Value) and (p.leaf or p.parents))
         self.idx = lo.n
         lo.n += 1
-
-    def __repr__(self):
-        return f'Value({self.t.type})'
 
     def __bool__(self):
         raise TypeError('a Triton value has no truth value: data-dependent python control flow cannot be lowered')
@@ -321,7 +314,4 @@ def vjp(sem, fn, args, g):
     lo = Lowering(sem)
     ts, shape = lo.inputs([*args, g])
     leaves = [Value(t, lo, leaf=True) for t in ts[:-1]]
-    y = fn(*leaves)
-    if not isinstance(y, Value):
-        y = const(y, leaves[0])
-    return tuple(lo.vjp(y, leaves, ts[-1], shape))
+    return tuple(lo.vjp(fn(*leaves), leaves, ts[-1], shape))

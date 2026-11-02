@@ -4,13 +4,7 @@ import numpy as np
 import pytest
 from conftest import FWDict
 
-from quantizers import (
-    FixedPointQuantizer,
-    binary_quantize,
-    float_decompose,
-    float_quantize,
-    ternary_quantize,
-)
+from quantizers import FixedPointQuantizer, float_decompose, float_quantize
 
 SEED = int(os.environ.get('PYTEST_SEED', 0))
 
@@ -59,7 +53,7 @@ def test_fixed_quantizer_grad(round_mode, overflow_mode, x_kif, fw: FWDict):
     if fw['grad'] is None:
         pytest.skip('No gradient support')
 
-    quantizer = FixedPointQuantizer(round_mode, overflow_mode)
+    quantizer = fw['q'].FixedPointQuantizer(round_mode, overflow_mode)
     assert callable(quantizer)
 
     x, k, i, f = x_kif
@@ -94,7 +88,7 @@ def test_fixed_quantizer_grad(round_mode, overflow_mode, x_kif, fw: FWDict):
 @pytest.mark.parametrize('null_xgrad_on_zero_width', [False, True])
 def test_fixed_quantizer_no_bits(round_mode, overflow_mode, x_kif, null_xgrad_on_zero_width, fw: FWDict):
     """k + i + f <= 0: qx=0, with the gradients left as they are"""
-    quantizer = FixedPointQuantizer(round_mode, overflow_mode, null_xgrad_on_zero_width)
+    quantizer = fw['q'].FixedPointQuantizer(round_mode, overflow_mode, null_xgrad_on_zero_width)
     rng = np.random.default_rng(0)
     x = np.concatenate([x_kif[0], np.zeros(64, np.float32)])  # exact 0: where clip ties would pass a gradient
     k = (rng.uniform(size=len(x)) > 0.5).astype(np.float32)
@@ -109,7 +103,8 @@ def test_fixed_quantizer_no_bits(round_mode, overflow_mode, x_kif, null_xgrad_on
     dx, di, df = fw['grad'](lambda x, i, f: quantizer(x, k, i, f), (0, 1, 2))(x, i, f)  # type: ignore
     dx, di, df = map(fw['to_np'], (dx, di, df))
     if not null_xgrad_on_zero_width:
-        dx_ref = fw['to_np'](fw['grad'](lambda x: quantizer.forward(x, k, i_clamped, f))(x))  # type: ignore
+        reference = FixedPointQuantizer(round_mode, overflow_mode)
+        dx_ref = fw['to_np'](fw['grad'](lambda x: reference.forward(x, k, i_clamped, f))(x))  # type: ignore
     else:
         dx_ref = np.zeros_like(dx)
     np.testing.assert_array_equal(dx, dx_ref)
@@ -123,12 +118,12 @@ def test_float_quantizer_grad(xxx_mee0, fw: FWDict):
     x_normal, x_subnormal, x_overflow = xxx
 
     def quantization_err(x, M, E, E0):
-        xq = float_quantize(x, M, E, E0)
+        xq = fw['q'].float_quantize(x, M, E, E0)
         return fw['abs'](x - xq)
 
     dx, dm, de, de0 = fw['grad'](quantization_err, range(4))(x_normal, M, E, E0)
     dx, dm, de, de0 = map(fw['to_np'], (dx, dm, de, de0))
-    xq = float_quantize(x_normal, M, E, E0)
+    xq = fw['q'].float_quantize(x_normal, M, E, E0)
     mask = x_normal != xq
     assert np.all(dx == 0), 'Normal Number X grad Error'
     assert np.all(dm[mask] < 0), f'Normal Number M grad Error: max={np.max(dm[mask])}>0'
@@ -137,7 +132,7 @@ def test_float_quantizer_grad(xxx_mee0, fw: FWDict):
 
     dx, dm, de, de0 = fw['grad'](quantization_err, range(4))(x_subnormal, M, E, E0)
     dx, dm, de, de0 = map(fw['to_np'], (dx, dm, de, de0))
-    xq = float_quantize(x_subnormal, M, E, E0)
+    xq = fw['q'].float_quantize(x_subnormal, M, E, E0)
     mask = x_subnormal != xq
     assert np.all(dx == 0), 'Subnormal Number X grad Error'
     assert np.all(dm[mask] < 0), f'Subnormal Number M grad Error: max={np.max(dm[mask])}>0'
@@ -194,9 +189,9 @@ def test_binary_quantizer_grad(x_kif, fw: FWDict):
     if fw['grad'] is None:
         pytest.skip('No gradient support')
     x, *_ = x_kif
-    xq = binary_quantize(x)
+    xq = fw['q'].binary_quantize(x)
     assert np.all((xq == -1) | (xq == 1)), 'Binary Quantizer Error'
-    grad = fw['grad'](lambda x: binary_quantize(x))(x)
+    grad = fw['grad'](lambda x: fw['q'].binary_quantize(x))(x)
     grad = fw['to_np'](grad)
     assert np.all(grad > 0), 'Gradient Error'
 
@@ -205,8 +200,8 @@ def test_ternary_quantizer_grad(x_kif, fw: FWDict):
     if fw['grad'] is None:
         pytest.skip('No gradient support')
     x, *_ = x_kif
-    xq = ternary_quantize(x)
+    xq = fw['q'].ternary_quantize(x)
     assert np.all((xq == -1) | (xq == 0) | (xq == 1)), 'Ternary Quantizer Error'
-    grad = fw['grad'](lambda x: ternary_quantize(x))(x)
+    grad = fw['grad'](lambda x: fw['q'].ternary_quantize(x))(x)
     grad = fw['to_np'](grad)
     assert np.all(grad > 0), 'Gradient Error'

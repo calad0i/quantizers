@@ -6,6 +6,8 @@ import numpy as np
 import pytest
 from gen_configs import CPP_SOURCE, gen_configs
 
+import quantizers
+
 
 class FWDict(TypedDict):
     make: Callable
@@ -14,6 +16,7 @@ class FWDict(TypedDict):
     extra: list
     jit: Callable | None
     abs: Callable
+    q: Any
 
 
 def pytest_sessionstart(session):
@@ -29,7 +32,7 @@ def pytest_sessionstart(session):
 
 
 def _numpy():
-    return dict(make=np.asarray, to_np=np.asarray, grad=None, extra=[np.float32(1.0), 1.0, 1])
+    return dict(make=np.asarray, to_np=np.asarray, grad=None, extra=[np.float32(1.0), 1.0, 1], q=quantizers)
 
 
 def _jax():
@@ -41,6 +44,7 @@ def _jax():
         extra=[],
         jit=jax.jit,
         abs=jax.numpy.abs,
+        q=quantizers,
     )
 
 
@@ -76,6 +80,7 @@ def _torch():
         extra=[torch.nn.Parameter(torch.ones(2))],
         abs=lambda x: torch.sum(torch.abs(x)),
         jit=None,
+        q=quantizers,
     )
 
 
@@ -104,6 +109,7 @@ def _tensorflow():
         extra=[tf.Variable(1.0)],
         jit=lambda fn: tf.function(fn, autograph=False),
         abs=tf.abs,
+        q=quantizers,
     )
 
 
@@ -124,7 +130,7 @@ def _mlx():
 
         return closure
 
-    return FWDict(make=mx.array, to_np=np.asarray, grad=grad, extra=[], jit=None, abs=mx.abs)
+    return FWDict(make=mx.array, to_np=np.asarray, grad=grad, extra=[], jit=None, abs=mx.abs, q=quantizers)
 
 
 def _tinygrad():
@@ -158,7 +164,18 @@ def _tinygrad():
         extra=[],
         jit=None,
         abs=lambda x: x.abs(),
+        q=quantizers,
     )
+
+
+def _triton():
+    """triton kernels in jax arrays and autodiff"""
+    triton = pytest.importorskip('triton')
+    if not triton.knobs.runtime.interpret:
+        pytest.skip('Triton kernels on numpy buffers: needs TRITON_INTERPRET=1')
+    import triton_quantizers
+
+    return FWDict(**{**_jax(), 'jit': None, 'q': triton_quantizers})
 
 
 FRAMEWORKS = {
@@ -168,6 +185,7 @@ FRAMEWORKS = {
     'tensorflow': _tensorflow,
     'mlx.core': _mlx,
     'tinygrad': _tinygrad,
+    'triton': _triton,
 }
 
 
