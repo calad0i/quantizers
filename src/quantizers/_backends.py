@@ -510,11 +510,6 @@ class KerasBackend(AbstractBackend):
         assert keras.backend.backend() in native_cls, f'Keras backend {keras.backend.backend()} is not supported'
         self.native = native_cls[keras.backend.backend()]()
 
-    @classmethod
-    def is_appropriate_type(cls, tensor):
-        # Keras 2 has no keras.Variable
-        return isinstance(tensor, getattr(sys.modules['keras'], 'Variable', ()))
-
     def _unwrap(self, x):
         return tuple(self._unwrap(v) for v in x) if isinstance(x, tuple) else (x.value if isinstance(x, self.Variable) else x)
 
@@ -537,7 +532,7 @@ def _delegate(name: str):
 
 
 for _name, _attr in list(vars(AbstractBackend).items()):
-    if callable(_attr) and not _name.startswith('_') and _name != 'is_appropriate_type':
+    if callable(_attr) and not _name.startswith('_'):
         setattr(KerasBackend, _name, _delegate(_name))
 
 
