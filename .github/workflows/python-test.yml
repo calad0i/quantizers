@@ -18,6 +18,7 @@ jobs:
         with:
           python-version: '3.13'
           cache-dependency-path: pyproject.toml
+          cache: 'pip'
 
       - name: Install dependencies
         run: |
