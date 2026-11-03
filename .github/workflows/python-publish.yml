@@ -9,22 +9,25 @@ permissions:
 
 jobs:
   deploy:
-
+    environment:
+      name: pypi
+      url: https://pypi.org/p/quantizers
     runs-on: ubuntu-latest
-
+    permissions:
+      id-token: write
     steps:
-    - uses: actions/checkout@v7
-      with:
-        fetch-depth: 0
-    - name: Set up Python
-      uses: actions/setup-python@v7
-      with:
-        python-version: '3.13'
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install build
-    - name: Build package
-      run: python -m build
-    - name: Publish package
-      uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+      - name: Build package
+        run: python -m build
+      - name: Publish package
+        uses: pypa/gh-action-pypi-publish@release/v1
