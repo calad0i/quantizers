@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=67.8", "setuptools_scm>=8"]
+requires = ["setuptools>=77", "setuptools_scm>=8"]
 
 build-backend = "setuptools.build_meta"
 
@@ -9,13 +9,13 @@ authors = [{ name = "Chang Sun", email = "chsun@cern.ch" }]
 description = ""
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "GNU Lesser General Public License v3 (LGPLv3)" }
+license = "LGPL-3.0-only"
+license-files = ["LICENSE"]
 keywords = ["quantization"]
 
 classifiers = [
   "Programming Language :: Python :: 3",
   "Operating System :: OS Independent",
-  "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
   "Development Status :: 5 - Production/Stable",
 ]
 dynamic = ["version"]
@@ -26,9 +26,10 @@ repository = "https://github.com/calad0i/quantizers"
 
 
 [tool.setuptools]
-packages = ["quantizers"]
 include-package-data = true
-package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 
 [tool.setuptools_scm]
