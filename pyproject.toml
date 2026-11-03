@@ -21,7 +21,6 @@ classifiers = [
 dynamic = ["version"]
 
 
-
 [project.urls]
 repository = "https://github.com/calad0i/quantizers"
 
